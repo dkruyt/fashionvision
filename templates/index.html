@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FashionVision</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Roboto', sans-serif;
+        }
+        .canvas-container {
+            border: 2px solid #3399cc;
+            display: inline-block;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .neuron {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            margin: 5px;
+            font-size: 10px;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .neuron:hover {
+            transform: scale(1.2);
+        }
+        .neuron-container {
+            display: inline-block;
+            text-align: center;
+            margin: 1px;
+        }
+        .neuron-number {
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #343a40;
+            font-weight: bold;
+        }
+        h1, h2 {
+            color: #3399cc;
+            margin-bottom: 20px;
+        }
+        .btn {
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #result {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #28a745;
+            margin-top: 20px;
+        }
+        #trainingData img {
+            margin: 2px;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            transition: transform 0.2s;
+        }
+        #trainingData img:hover {
+            transform: scale(1.1);
+        }
+        #logWindow {
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            background-color: #ffffff;
+            margin-top: 20px;
+            border-radius: 5px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #3399cc;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container my-5">
+        <h1 class="text-center mb-5"><i class="fas fa-tshirt"></i> FashionVision</h1>
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="mb-0">Neural Network Visualization</h2>
+                    </div>
+                    <div class="card-body text-center">
+                        <h3>Input Layer</h3>
+                        <div class="canvas-container mx-auto">
+                            <canvas id="inputCanvas" width="280" height="280"></canvas>
+                        </div>
+                        <h3 class="mt-3"><i class="fas fa-arrow-down"></i></h3>
+                        <div class="canvas-container mx-auto">
+                            <canvas id="extendedLineCanvas" width="560" height="10"></canvas>
+                        </div>
+                        <h3 class="mt-3"><i class="fas fa-arrow-down"></i>Hidden Layer <i class="fas fa-arrow-down"></i></h3>
+                        <div id="hiddenLayer" class="neuron-container mx-auto"></div>
+                        <h3 class="mt-3"><i class="fas fa-arrow-down"></i>Output Layer <i class="fas fa-arrow-down"></i></h3>
+                        <div id="outputLayer" class="neuron-container mx-auto"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="mb-0">Dashboard</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <button id="predictButton" class="btn btn-primary"><i class="fas fa-magic"></i> Predict</button>
+                            <button id="clearButton" class="btn btn-secondary"><i class="fas fa-eraser"></i> Clear</button>
+                            <button id="prepareButton" class="btn btn-info"><i class="fas fa-database"></i> Load Data</button>
+                            <button id="train1Button" class="btn btn-success"><i class="fas fa-graduation-cap"></i> Train 1x</button>
+                            <button id="train10Button" class="btn btn-success"><i class="fas fa-graduation-cap"></i> Train 10x</button>
+                            <button id="train100Button" class="btn btn-success"><i class="fas fa-graduation-cap"></i> Train 100x</button>
+                            <button id="clearModelButton" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Clear network</button>
+                            <button id="helpButton" class="btn btn-info"><i class="fas fa-question-circle"></i> Help</button>
+                            <button id="graphsButton" class="btn btn-info"><i class="fas fa-chart-line"></i> Graphs</button>
+                            <button id="distributionsButton" class="btn btn-info"><i class="fas fa-chart-bar"></i> Distributions</button>
+                            <button id="networkVisualizationButton" class="btn btn-info"><i class="fas fa-project-diagram"></i> Network Visualization</button>
+                            <button id="showConfusionMatrixButton" class="btn btn-info"><i class="fas fa-table"></i> Confusion Matrix</button>
+                            <button id="uploadButton" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Image</button>
+                            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                        </div>
+                        <div id="result" class="mt-3"></div>
+                        <div id="logWindow" class="mt-3"></div>
+                        <h3 class="mt-4">Training Data</h3>
+                        <div id="trainingData" class="d-flex flex-wrap"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network Visualization Modal -->
+    <div class="modal fade" id="networkVisualizationModal" tabindex="-1" aria-labelledby="networkVisualizationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="networkVisualizationModalLabel">Neural Network Visualization</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <canvas id="networkVisualizationCanvas"></canvas>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confusion Matrix Modal -->
+    <div class="modal fade" id="confusionMatrixModal" tabindex="-1" aria-labelledby="confusionMatrixModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confusionMatrixModalLabel">Confusion Matrix</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="confusionMatrixContainer"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="helpModalLabel">Help</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h4>Welcome to FashionVision!</h4>
+                    <p>FashionVision is an interactive web application that allows you to explore and understand how a neural network recognizes fashion items. Follow the steps below to get started:</p>
+                    <ol>
+                        <li>
+                            <strong>Load Training Data:</strong> Click the "Load Data" button to load the training data. This data consists of a collection of clothing items that will be used to train the neural network. The loaded training images will be displayed in the "Training Data" section.
+                        </li>
+                        <li>
+                            <strong>Explore the Neural Network:</strong> Take a moment to familiarize yourself with the neural network architecture displayed on the left side of the screen. The input layer represents a 28x28 grid where you can draw a clothing item, the hidden layer consists of neurons that learn to recognize patterns, and the output layer represents the predicted item.
+                        </li>
+                        <li>
+                            <strong>Draw an Item:</strong> Use your mouse to draw an item on the input layer grid. Click on individual cells to toggle them between black and white. The goal is to draw a recognizable item that the neural network can predict.
+                        </li>
+                        <li>
+                            <strong>Make a Prediction:</strong> Once you've drawn an item, click the "Predict" button to see what the neural network thinks the item is. The predicted item will be displayed in the "Dashboard" section.
+                        </li>
+                        <li>
+                            <strong>Train the Neural Network:</strong> To improve the neural network's accuracy, you can train it using the loaded training data. Click the "Train 1x," "Train 10x," or "Train 100x" buttons to train the network for the specified number of epochs. During training, the app will display the training progress and metrics in the log window.
+                        </li>
+                        <li>
+                            <strong>Evaluate the Neural Network:</strong> After training, you can draw more items and click "Predict" to see how well the neural network performs. The app will display the predicted item and the activations of the hidden and output layers.
+                        </li>
+                        <li>
+                            <strong>Explore Further:</strong>
+                            <ul>
+                                <li>Click on the neurons in the output layer to see how the neural network responds when you manually assign a label to your drawn item. This can help you understand how the network learns from individual examples.</li>
+                                <li>Use the "Clear" button to clear the input layer grid and start drawing a new item.</li>
+                                <li>Click the "Clear Model Data" button to reset the neural network to its initial state, clearing all learned weights.</li>
+                                <li>Explore the "Graphs" section to visualize the training and validation metrics, including loss and accuracy over epochs.</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    <p>Have fun exploring and learning about neural networks and fashion item recognition with FashionVision!</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphs Modal -->
+    <div class="modal fade" id="graphsModal" tabindex="-1" aria-labelledby="graphsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="graphsModalLabel">Training and Validation Metrics</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h3>Training Loss</h3>
+                            <canvas id="trainingLossChart"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <h3>Validation Loss</h3>
+                            <canvas id="validationLossChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h3>Training Accuracy</h3>
+                            <canvas id="trainingAccuracyChart"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <h3>Validation Accuracy</h3>
+                            <canvas id="validationAccuracyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distributions Modal -->
+    <div class="modal fade" id="distributionsModal" tabindex="-1" aria-labelledby="distributionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="distributionsModalLabel">Distributions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h3>Weight Distribution</h3>
+                            <img id="weightHistogram" class="img-fluid">
+                        </div>
+                        <div class="col-md-6">
+                            <h3>Bias Distribution</h3>
+                            <img id="biasHistogram" class="img-fluid">
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h3>Activation Distribution</h3>
+                            <img id="activationHistogram" class="img-fluid">
+                        </div>
+                        <div class="col-md-6">
+                            <h3>Prediction Confidence</h3>
+                            <canvas id="confidenceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="/static/index.js"></script>
+</body>
+</html>

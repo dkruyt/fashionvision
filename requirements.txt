@@ -1,0 +1,9 @@
+Flask
+flask-socketio
+torch
+numpy
+pandas
+requests
+Pillow
+eventlet
+matplotlib
