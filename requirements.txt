@@ -1,9 +1,11 @@
 Flask
 flask-socketio
 torch
+torchvision
 numpy
 pandas
 requests
 Pillow
 eventlet
 matplotlib
+scikit-learn
