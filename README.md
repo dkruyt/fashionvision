@@ -1,11 +1,11 @@
-# DigitVision
+# FashionVision
 
-DigitVision is a flask web application built on PyTorch that allows users to interactively train and visualize a neural network for recognizing handwritten digits. The app provides an intuitive interface for drawing digits, training the model, and visualizing training metrics such as loss and accuracy.
+FashionVision is a Flask web application built on PyTorch that allows users to interactively train and visualize a neural network for recognizing fashion items. The app provides an intuitive interface for uploading or drawing fashion items, training the model, and visualizing various aspects of the neural network and its performance.
 
 ## Features
 
 - **Interactive Digit Drawing:** Draw digits on a grid to test the neural network's predictions.
-- **Real-Time Training:** Train the neural network on a dataset of handwritten digits and visualize training progress in real-time.
+- **Real-Time Training:** Train the neural network on the Fashion-MNIST dataset and visualize training progress in real-time.
 - **Metrics Visualization:** View training and validation loss and accuracy in a popup graph.
 - **Model Management:** Save and load trained models for later use.
 - **Hyperparameter Tuning:** Adjust training parameters like learning rate and batch size through the UI.
@@ -33,8 +33,8 @@ Ensure you have the following installed:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/dkruyt/digitvision.git
-   cd digitvision
+   git clone https://github.com/dkruyt/fashionvision.git
+   cd fashionvision
    ```
 
 2. **Build and run the application using Docker Compose:**
@@ -56,7 +56,6 @@ Ensure you have the following installed:
    - Click the "Predict" button to see the neural network's prediction.
    - Load training data and start training the model using the provided buttons.
    - View training and validation metrics by clicking the "Graphs" button.
-   - Save and load trained models using the respective buttons.
 
 ### File Structure
 
@@ -100,10 +99,10 @@ This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) fi
 
 ### Acknowledgments
 
-- The Optical Recognition of Handwritten Digits dataset used in this app is provided by the UCI Machine Learning Repository.
+- The Fashion-MNIST dataset used in this app is provided by Zalando Research.
 - Thanks to the open-source community for providing the tools and libraries that made this project possible.
 - Sparky, for his BackPropagation app, which inspired this application.
 
 ---
 
-Happy training with DigitVision!
+Happy training with FashionVision!
