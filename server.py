@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import confusion_matrix
 from torchvision import datasets, transforms
+from torch.utils.data.sampler import SubsetRandomSampler
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -44,39 +45,45 @@ class SimpleNN(nn.Module):
         return hidden_activations
 
 # Load Fashion-MNIST dataset
-def load_fashion_mnist(limit_per_class=100):
+def load_fashion_mnist(limit_per_class=1000, validation_split=0.2):
     transform = transforms.Compose([transforms.ToTensor()])
-    train_dataset = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
+    full_dataset = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
     
     class_counts = {i: 0 for i in range(10)}
-    input_data = []
-    target_data = []
+    train_data = []
+    train_targets = []
+    val_data = []
+    val_targets = []
     
-    for img, label in train_dataset:
+    for img, label in full_dataset:
         if class_counts[label] < limit_per_class:
-            inverted_img = 1 - img.numpy() # Invert the image
-            input_data.append(inverted_img.flatten())
-            target_data.append(label)
+            inverted_img = 1 - img.numpy()  # Invert the image
+            if np.random.rand() < validation_split:
+                val_data.append(inverted_img.flatten())
+                val_targets.append(label)
+            else:
+                train_data.append(inverted_img.flatten())
+                train_targets.append(label)
             class_counts[label] += 1
         
         if all(count >= limit_per_class for count in class_counts.values()):
             break
     
-    return np.array(input_data), np.array(target_data)
+    return (np.array(train_data), np.array(train_targets)), (np.array(val_data), np.array(val_targets))
 
 # Training loop
-def train(model, criterion, optimizer, dataloader, epochs=100):
+def train(model, criterion, optimizer, train_dataloader, val_dataloader=None, epochs=100):
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
     training_metrics = {'epoch': [], 'training_loss': [], 'validation_loss': [], 'training_accuracy': [], 'validation_accuracy': []}
     
     for epoch in range(epochs):
         model.train()
-        epoch_loss = 0.0
-        correct = 0
-        total = 0
+        train_loss = 0.0
+        train_correct = 0
+        train_total = 0
         
-        for inputs, targets in dataloader:
+        for inputs, targets in train_dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -85,40 +92,46 @@ def train(model, criterion, optimizer, dataloader, epochs=100):
             loss.backward()
             optimizer.step()
             
-            epoch_loss += loss.item()
+            train_loss += loss.item()
             _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+            train_total += targets.size(0)
+            train_correct += predicted.eq(targets).sum().item()
         
-        training_loss = epoch_loss / len(dataloader)
-        training_accuracy = 100. * correct / total
+        train_loss /= len(train_dataloader)
+        train_accuracy = 100. * train_correct / train_total
         
-        # Validation metrics
-        model.eval()
-        val_loss, val_correct, val_total = 0.0, 0, 0
-        with torch.no_grad():
-            for inputs, targets in dataloader:
-                inputs, targets = inputs.to(device), targets.to(device)
-                outputs = model(inputs)
-                loss = criterion(outputs, targets)
-                
-                val_loss += loss.item()
-                _, predicted = outputs.max(1)
-                val_total += targets.size(0)
-                val_correct += predicted.eq(targets).sum().item()
-        
-        validation_loss = val_loss / len(dataloader)
-        validation_accuracy = 100. * val_correct / val_total
+        # Validation
+        val_loss = 0.0
+        val_accuracy = 0.0
+        if val_dataloader is not None:
+            model.eval()
+            val_correct = 0
+            val_total = 0
+            with torch.no_grad():
+                for inputs, targets in val_dataloader:
+                    inputs, targets = inputs.to(device), targets.to(device)
+                    outputs = model(inputs)
+                    loss = criterion(outputs, targets)
+                    
+                    val_loss += loss.item()
+                    _, predicted = outputs.max(1)
+                    val_total += targets.size(0)
+                    val_correct += predicted.eq(targets).sum().item()
+            
+            val_loss /= len(val_dataloader)
+            val_accuracy = 100. * val_correct / val_total
         
         # Log metrics
         training_metrics['epoch'].append(epoch)
-        training_metrics['training_loss'].append(training_loss)
-        training_metrics['validation_loss'].append(validation_loss)
-        training_metrics['training_accuracy'].append(training_accuracy)
-        training_metrics['validation_accuracy'].append(validation_accuracy)
+        training_metrics['training_loss'].append(train_loss)
+        training_metrics['validation_loss'].append(val_loss)
+        training_metrics['training_accuracy'].append(train_accuracy)
+        training_metrics['validation_accuracy'].append(val_accuracy)
         
         if epoch % 1 == 0:
-            log_message = f"Epoch {epoch}, Training Loss: {training_loss}, Validation Loss: {validation_loss}, Training Accuracy: {training_accuracy}, Validation Accuracy: {validation_accuracy}"
+            log_message = f"Epoch {epoch}, Training Loss: {train_loss:.4f}, Training Accuracy: {train_accuracy:.2f}%"
+            if val_dataloader is not None:
+                log_message += f", Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.2f}%"
             print(log_message)
             socketio.emit('log', {'message': log_message})
             socketio.emit('training_metrics', training_metrics)
@@ -148,12 +161,16 @@ def predict():
 
 @app.route('/confusion_matrix', methods=['GET'])
 def get_confusion_matrix():
-    global model, input_data, target_data
+    global model, train_data, train_targets, val_data, val_targets
     model.eval()
     with torch.no_grad():
-        outputs = model(torch.tensor(input_data, dtype=torch.float32))
+        # Combine train and validation data for the confusion matrix
+        all_data = np.concatenate((train_data, val_data), axis=0)
+        all_targets = np.concatenate((train_targets, val_targets), axis=0)
+        
+        outputs = model(torch.tensor(all_data, dtype=torch.float32))
         _, predicted = torch.max(outputs, 1)
-    cm = confusion_matrix(target_data, predicted.numpy())
+    cm = confusion_matrix(all_targets, predicted.numpy())
     return jsonify({'confusionMatrix': cm.tolist()})
 
 @app.route('/upload_image', methods=['POST'])
@@ -170,16 +187,19 @@ def upload_image():
 
 @app.route('/train', methods=['POST'])
 def train_model():
-    global model, input_data, target_data
+    global model, train_data, train_targets, val_data, val_targets
     epochs = int(request.json['epochs'])
 
-    dataset = TensorDataset(torch.tensor(input_data, dtype=torch.float32), torch.tensor(target_data, dtype=torch.long))
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    train_dataset = TensorDataset(torch.tensor(train_data, dtype=torch.float32), torch.tensor(train_targets, dtype=torch.long))
+    val_dataset = TensorDataset(torch.tensor(val_data, dtype=torch.float32), torch.tensor(val_targets, dtype=torch.long))
+    
+    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    train(model, criterion, optimizer, dataloader, epochs)
+    train(model, criterion, optimizer, train_dataloader, val_dataloader, epochs)
     model.eval()
     return jsonify({'message': 'Training completed'})
 
@@ -191,14 +211,27 @@ def clear_model_data():
 
 @app.route('/training_data', methods=['GET'])
 def get_training_data():
+    global train_data
     training_data = []
-    for img in input_data:
+    for img in train_data:
         img = Image.fromarray((img.reshape(28, 28) * 255).astype(np.uint8))
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         training_data.append(img_str)
     return jsonify({'trainingData': training_data})
+
+@app.route('/validation_data', methods=['GET'])
+def get_validation_data():
+    global val_data
+    validation_data = []
+    for img in val_data:
+        img = Image.fromarray((img.reshape(28, 28) * 255).astype(np.uint8))
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        validation_data.append(img_str)
+    return jsonify({'trainingData': validation_data})
 
 @app.route('/train_single', methods=['POST'])
 def train_single_example():
@@ -207,23 +240,32 @@ def train_single_example():
     input_grid = np.array(data['inputGrid'])
     class_label = data['classLabel']
 
-    input_tensor = torch.tensor([input_grid.flatten()], dtype=torch.float32)
+    input_tensor = torch.tensor(input_grid.flatten()[np.newaxis, :], dtype=torch.float32)
     target_tensor = torch.tensor([class_label], dtype=torch.long)
 
-    dataset = TensorDataset(input_tensor, target_tensor)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    train_dataset = TensorDataset(input_tensor, target_tensor)
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    train(model, criterion, optimizer, dataloader, epochs=1)
+    train(model, criterion, optimizer, train_dataloader, epochs=1)
     model.eval()
     return jsonify({'message': f'Trained on single example of class {class_label}'})
 
 @app.route('/load_training_image', methods=['POST'])
 def load_training_image():
+    global train_data
     index = request.json['index']
-    img = input_data[index].reshape(28, 28)
+    img = train_data[index].reshape(28, 28)
+    input_grid = img.tolist()
+    return jsonify({'inputGrid': input_grid})
+
+@app.route('/load_validation_image', methods=['POST'])
+def load_validation_image():
+    global val_data
+    index = request.json['index']
+    img = val_data[index].reshape(28, 28)
     input_grid = img.tolist()
     return jsonify({'inputGrid': input_grid})
 
@@ -250,6 +292,14 @@ def get_network_visualization():
         'hiddenWeights': hidden_weights.tolist(),
         'outputWeights': output_weights.tolist()
     })
+
+@app.route('/update_hidden_neurons', methods=['POST'])
+def update_hidden_neurons():
+    global model
+    new_hidden_neurons = int(request.json['hiddenNeurons'])
+    model = SimpleNN(hidden_neurons=new_hidden_neurons, output_neurons=10)
+    model.eval()
+    return jsonify({'message': f'Updated hidden neurons to {new_hidden_neurons}'})
 
 @app.route('/distributions', methods=['POST'])
 def get_distributions():
@@ -291,7 +341,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    input_data, target_data = load_fashion_mnist(limit_per_class=args.limit_per_class)
+    (train_data, train_targets), (val_data, val_targets) = load_fashion_mnist(limit_per_class=args.limit_per_class)
 
     model = SimpleNN(hidden_neurons=args.hidden_neurons, output_neurons=10)
     model.eval()

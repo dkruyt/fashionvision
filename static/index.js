@@ -26,7 +26,24 @@ $(document).ready(function() {
             }
         });
     }
+
+    function updateHiddenNeurons() {
+        var hiddenNeurons = $('#hiddenNeuronsInput').val();
+        $.ajax({
+            url: '/update_hidden_neurons',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ hiddenNeurons: hiddenNeurons }),
+            success: function(response) {
+                console.log(response.message);
+                alert('Hidden neurons updated. The model has been reset.');
+                clear();
+            }
+        });
+    }
     
+    $('#updateHiddenNeuronsButton').click(updateHiddenNeurons);
+
     function drawNetworkVisualization(data) {
         var canvas = document.getElementById('networkVisualizationCanvas');
         var ctx = canvas.getContext('2d');
@@ -268,16 +285,6 @@ $(document).ready(function() {
         $('#outputLayer').empty();
     }
 
-    function prepareData() {
-        $.ajax({
-            url: '/training_data',
-            method: 'GET',
-            success: function(response) {
-                showTrainingData(response.trainingData);
-            }
-        });
-    }
-
     function trainModel(epochs) {
         $.ajax({
             url: '/train',
@@ -303,6 +310,7 @@ $(document).ready(function() {
     }
 
     function showTrainingData(trainingData) {
+        console.log("Showing training data");
         var trainingHtml = '';
         for (var i = 0; i < trainingData.length; i++) {
             var img = trainingData[i];
@@ -311,6 +319,11 @@ $(document).ready(function() {
         }
         $('#trainingData').html(trainingHtml);
     }
+
+    $(document).on('click', '#trainingData img', function() {
+        var index = $(this).data('index');
+        loadTrainingImage(index);
+    });
 
     function loadTrainingImage(index) {
         $.ajax({
@@ -326,6 +339,78 @@ $(document).ready(function() {
             }
         });
     }
+    
+    $('#validationDataSection').addClass('data-hidden');
+    $('#trainingDataSection').addClass('data-hidden');
+
+    function showValidationData(validationData) {
+        var validationHtml = '';
+        for (var i = 0; i < validationData.length; i++) {
+            var img = validationData[i];
+            var imgHtml = '<img src="data:image/png;base64,' + img + '" width="28" height="28" data-index="' + i + '" class="validation-image">';
+            validationHtml += imgHtml;
+        }
+        $('#validationData').html(validationHtml);
+    }
+
+    $(document).on('click', '#validationData img', function() {
+        var index = $(this).data('index');
+        loadValidationImage(index);
+    });
+    
+    function loadValidationImage(index) {
+        $.ajax({
+            url: '/load_validation_image',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ index: index }),
+            success: function(response) {
+                inputGrid = response.inputGrid;
+                drawInputGrid();
+                drawExtendedLine();
+                predict();
+            }
+        });
+    }
+
+    let dataLoaded = false;
+    let showingTrainingData = true;
+    
+    $('#dataButton').click(function() {        
+        if (!dataLoaded) {
+            prepareData();
+            dataLoaded = true;
+            $(this).html('<i class="fas fa-exchange-alt"></i> Show Validation Data');
+        } else {
+            $('#trainingDataSection, #validationDataSection').toggleClass('data-hidden');
+            if (showingTrainingData) {
+                $(this).html('<i class="fas fa-exchange-alt"></i> Show Training Data');
+            } else {
+                $(this).html('<i class="fas fa-exchange-alt"></i> Show Validation Data');
+            }
+            showingTrainingData = !showingTrainingData;
+        }
+    });
+    
+    function prepareData() {
+        $.ajax({
+            url: '/training_data',
+            method: 'GET',
+            success: function(trainingResponse) {
+                showTrainingData(trainingResponse.trainingData);
+                $('#trainingDataSection').removeClass('data-hidden');
+                
+                $.ajax({
+                    url: '/validation_data',
+                    method: 'GET',
+                    success: function(validationResponse) {
+                        showValidationData(validationResponse.trainingData);
+                        $('#validationDataSection').addClass('data-hidden');
+                    }
+                });
+            }
+        });
+    }
 
     function trainSingleExample(classLabel) {
         $.ajax({
@@ -334,7 +419,6 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ inputGrid: inputGrid, classLabel: classLabel }),
             success: function(response) {
-                console.log('Training on class ' + classLabel + ' completed');
                 predict();
             }
         });
@@ -502,16 +586,10 @@ $(document).ready(function() {
 
     $('#predictButton').click(predict);
     $('#clearButton').click(clear);
-    $('#prepareButton').click(prepareData);
     $('#train1Button').click(function() { trainModel(1); });
     $('#train10Button').click(function() { trainModel(10); });
     $('#train100Button').click(function() { trainModel(100); });
     $('#clearModelButton').click(clearModelData);
-
-    $(document).on('click', '#trainingData img', function() {
-        var index = $(this).data('index');
-        loadTrainingImage(index);
-    });
 
     // Socket.IO client
     var socket = io();
