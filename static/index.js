@@ -596,7 +596,9 @@ $(document).ready(function() {
 
     socket.on('log', function(data) {
         var logWindow = document.getElementById('logWindow');
-        logWindow.innerHTML += '<p>' + data.message + '</p>';
+        var logEntry = document.createElement('p');
+        logEntry.textContent = data.message;
+        logWindow.appendChild(logEntry);
         logWindow.scrollTop = logWindow.scrollHeight;
     });
 

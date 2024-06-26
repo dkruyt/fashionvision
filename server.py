@@ -207,6 +207,7 @@ def train_model():
 def clear_model_data():
     global model
     model = SimpleNN(args.hidden_neurons, 10)
+    socketio.emit('log', {'message': 'Model data cleared'})
     return jsonify({'message': 'Model data cleared'})
 
 @app.route('/training_data', methods=['GET'])
@@ -250,6 +251,7 @@ def train_single_example():
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     train(model, criterion, optimizer, train_dataloader, epochs=1)
+    socketio.emit('log', {'message': f'Trained on single example of class {class_label}'})
     model.eval()
     return jsonify({'message': f'Trained on single example of class {class_label}'})
 
@@ -299,6 +301,7 @@ def update_hidden_neurons():
     new_hidden_neurons = int(request.json['hiddenNeurons'])
     model = SimpleNN(hidden_neurons=new_hidden_neurons, output_neurons=10)
     model.eval()
+    socketio.emit('log', {'message': f'Updated hidden neurons to {new_hidden_neurons}'})
     return jsonify({'message': f'Updated hidden neurons to {new_hidden_neurons}'})
 
 @app.route('/distributions', methods=['POST'])
@@ -337,7 +340,7 @@ def get_distributions():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a simple neural network on the Fashion-MNIST dataset.')
     parser.add_argument('--hidden_neurons', type=int, default=128, help='Number of neurons in the hidden layer (default: 128)')
-    parser.add_argument('--limit_per_class', type=int, default=100, help='Number of samples per class for training (default: 100)')
+    parser.add_argument('--limit_per_class', type=int, default=200, help='Number of samples per class for training (default: 100)')
 
     args = parser.parse_args()
 
