@@ -293,6 +293,7 @@ $(document).ready(function() {
             data: JSON.stringify({ epochs: epochs }),
             success: function(response) {
                 console.log(response.message);
+                showValidationData(response.validationData);
                 predict();
             }
         });
@@ -346,8 +347,18 @@ $(document).ready(function() {
     function showValidationData(validationData) {
         var validationHtml = '';
         for (var i = 0; i < validationData.length; i++) {
-            var img = validationData[i];
-            var imgHtml = '<img src="data:image/png;base64,' + img + '" width="28" height="28" data-index="' + i + '" class="validation-image">';
+            var item = validationData[i];
+            var borderClass = item.is_correct ? 'border-success' : 'border-danger';
+            var imgHtml = `<div class="validation-image-container">
+                               <img src="data:image/png;base64,${item.image}" 
+                                    width="28" height="28" 
+                                    data-index="${i}" 
+                                    class="validation-image ${borderClass}">
+                               <!-- <div class="validation-info">
+                                   Predicted: ${item.predicted}<br>
+                                   Actual: ${item.actual}
+                               </div> -->
+                           </div>`;
             validationHtml += imgHtml;
         }
         $('#validationData').html(validationHtml);
@@ -404,7 +415,7 @@ $(document).ready(function() {
                     url: '/validation_data',
                     method: 'GET',
                     success: function(validationResponse) {
-                        showValidationData(validationResponse.trainingData);
+                        showValidationData(validationResponse.validationData);
                         $('#validationDataSection').addClass('data-hidden');
                     }
                 });
@@ -419,6 +430,8 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ inputGrid: inputGrid, classLabel: classLabel }),
             success: function(response) {
+                console.log(response.message);
+                showValidationData(response.validationData);
                 predict();
             }
         });

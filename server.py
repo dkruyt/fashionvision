@@ -201,7 +201,14 @@ def train_model():
 
     train(model, criterion, optimizer, train_dataloader, val_dataloader, epochs)
     model.eval()
-    return jsonify({'message': 'Training completed'})
+    
+    # Get updated validation data
+    updated_validation_data = get_latest_validation_data()
+    
+    return jsonify({
+        'message': 'Training completed',
+        'validationData': updated_validation_data
+    })
 
 @app.route('/clear', methods=['POST'])
 def clear_model_data():
@@ -222,17 +229,33 @@ def get_training_data():
         training_data.append(img_str)
     return jsonify({'trainingData': training_data})
 
+def get_latest_validation_data():
+    global model, val_data, val_targets
+    validation_data = []
+    model.eval()
+    with torch.no_grad():
+        for img, target in zip(val_data, val_targets):
+            img_tensor = torch.tensor(img, dtype=torch.float32).unsqueeze(0)
+            output = model(img_tensor)
+            predicted = output.argmax().item()
+            is_correct = int(predicted == target)  # Convert boolean to int
+
+            img = Image.fromarray((img.reshape(28, 28) * 255).astype(np.uint8))
+            buffered = io.BytesIO()
+            img.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            validation_data.append({
+                'image': img_str,
+                'predicted': int(predicted),
+                'actual': int(target.item()),
+                'is_correct': is_correct
+            })
+    return validation_data
+
 @app.route('/validation_data', methods=['GET'])
 def get_validation_data():
-    global val_data
-    validation_data = []
-    for img in val_data:
-        img = Image.fromarray((img.reshape(28, 28) * 255).astype(np.uint8))
-        buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        validation_data.append(img_str)
-    return jsonify({'trainingData': validation_data})
+    validation_data = get_latest_validation_data()
+    return jsonify({'validationData': validation_data})
 
 @app.route('/train_single', methods=['POST'])
 def train_single_example():
@@ -253,7 +276,14 @@ def train_single_example():
     train(model, criterion, optimizer, train_dataloader, epochs=1)
     socketio.emit('log', {'message': f'Trained on single example of class {class_label}'})
     model.eval()
-    return jsonify({'message': f'Trained on single example of class {class_label}'})
+    
+    # Get updated validation data
+    updated_validation_data = get_latest_validation_data()
+    
+    return jsonify({
+        'message': f'Trained on single example of class {class_label}',
+        'validationData': updated_validation_data
+    })
 
 @app.route('/load_training_image', methods=['POST'])
 def load_training_image():
