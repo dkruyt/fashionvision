@@ -25,7 +25,7 @@ args = parser.parse_args()
 
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode='eventlet')
 
 # Dictionary mapping Fashion-MNIST label indices to their corresponding class names
 fashion_mnist_labels = {
@@ -221,6 +221,7 @@ def train(current_model, criterion, optimizer, train_dataloader, val_dataloader=
             print(log_message)
             socketio.emit('log', {'message': log_message})
             socketio.emit('training_metrics', training_metrics)
+            socketio.sleep(0) 
     
     current_model.cpu()
 
