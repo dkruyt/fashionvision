@@ -233,31 +233,36 @@ $(document).ready(function() {
         var hiddenHtml = '';
         for (var i = 0; i < hiddenActivations[0].length; i++) {
             var activation = hiddenActivations[0][i];
-            var color = getColorMap(activation);
-            hiddenHtml += '<div class="neuron hidden-neuron" style="background-color: ' + color + ';" data-index="' + i + '">' + activation.toFixed(3) + '</div>';
+            var imageIndex = getImageIndex(activation);
+            hiddenHtml += '<div class="neuron hidden-neuron" style="background-image: url(\'static/images/' + imageIndex + '.svg\');" data-index="' + i + '"><span>' + activation.toFixed(2) + '</span></div>';
         }
         $('#hiddenLayer').html(hiddenHtml);
-
+    
         var outputHtml = '';
         for (var i = 0; i < outputActivations[0].length; i++) {
             var activation = outputActivations[0][i];
-            var color = getColorMap(activation);
+            var imageIndex = getImageIndex(activation);
             outputHtml += '<div class="neuron-container" style="text-align: center;">';
-            outputHtml += '<div class="neuron output-neuron" style="background-color: ' + color + ';" data-index="' + i + '">' + activation.toFixed(3) + '</div>';
+            outputHtml += '<div class="neuron output-neuron" style="background-image: url(\'static/images/' + imageIndex + '.svg\');" data-index="' + i + '"><span>' + activation.toFixed(2) + '</span></div>';
             const labels = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'];
             outputHtml += '<div class="neuron-number">' + labels[i] + '</div>'; // Use Fashion-MNIST class names
             outputHtml += '</div>';
         }
         $('#outputLayer').html(outputHtml);
-
+    
         addNeuronClickHandlers();
     }
-
-    function getColorMap(value) {
-        value = Math.max(0, Math.min(1, value));
-        var hue = (1 - value) * 240;
-        return 'hsl(' + hue + ', 100%, 50%)';
+    
+    function getImageIndex(activation) {
+        // Maps the activation value (now from -2 to 2) inversely to an image index (1-7)
+        var normalizedValue = (activation + 2) / 4; // Normalize to [0,1]
+        var invertedIndex = 1 - normalizedValue; // Invert the mapping
+        var index = Math.round(invertedIndex * 6) + 1; // Scale to [1,7]
+        return Math.max(1, Math.min(7, index)); // Ensures the index stays within the range of available images
     }
+    
+    
+    
 
     function predict() {
         $.ajax({
