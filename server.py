@@ -4,6 +4,7 @@ from flask_socketio import SocketIO, emit
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 import numpy as np
 import io
 import base64
@@ -16,9 +17,17 @@ from sklearn.metrics import confusion_matrix
 from torchvision import datasets, transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 
+parser = argparse.ArgumentParser(description='Train a simple neural network on the Fashion-MNIST dataset.')
+parser.add_argument('--hidden_neurons', type=int, default=24, help='Number of neurons in the hidden layer (default: 24)')
+parser.add_argument('--limit_per_class', type=int, default=250, help='Number of samples per class for training (default: 200)')
+
+args = parser.parse_args()
+
+
 app = Flask(__name__)
 socketio = SocketIO(app)
 
+# Dictionary mapping Fashion-MNIST label indices to their corresponding class names
 fashion_mnist_labels = {
     0: 'T-shirt/top',
     1: 'Trouser',
@@ -57,6 +66,70 @@ class SimpleNN(nn.Module):
             hidden_activations = self.activation(self.hidden(x)).flatten().tolist()
         return hidden_activations
 
+# Add the new FashionMNISTNet class
+class FashionMNISTNet(nn.Module):
+    def __init__(self):
+        super(FashionMNISTNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, 1)
+        self.conv2 = nn.Conv2d(32, 64, 3, 1)
+        self.dropout1 = nn.Dropout2d(0.25)
+        self.dropout2 = nn.Dropout2d(0.5)
+        self.fc1 = nn.Linear(9216, 128)
+        self.fc2 = nn.Linear(128, 10)
+
+    def forward(self, x):
+        x = x.view(-1, 1, 28, 28)  # Reshape input to (batch_size, 1, 28, 28)
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = F.max_pool2d(x, 2)
+        x = self.dropout1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        return x
+
+    def get_weight_bias_distributions(self):
+        weights = torch.cat([self.conv1.weight.data.flatten(),
+                             self.conv2.weight.data.flatten(),
+                             self.fc1.weight.data.flatten(),
+                             self.fc2.weight.data.flatten()]).tolist()
+        biases = torch.cat([self.conv1.bias.data.flatten(),
+                            self.conv2.bias.data.flatten(),
+                            self.fc1.bias.data.flatten(),
+                            self.fc2.bias.data.flatten()]).tolist()
+        return weights, biases
+
+    def get_activation_distribution(self, x):
+        with torch.no_grad():
+            x = x.view(-1, 1, 28, 28)
+            x = F.relu(self.conv1(x))
+            x = F.relu(self.conv2(x))
+            x = F.max_pool2d(x, 2)
+            x = torch.flatten(x, 1)
+            x = F.relu(self.fc1(x))
+            return x.flatten().tolist()
+
+# Modify the global model variable
+model = SimpleNN(args.hidden_neurons, 10)
+advanced_model = FashionMNISTNet()
+current_model = model
+
+# Add a new route to switch models
+@app.route('/switch_model', methods=['POST'])
+def switch_model():
+    global current_model, model, advanced_model
+    model_type = request.json['modelType']
+    if model_type == 'simple':
+        current_model = model
+    elif model_type == 'advanced':
+        current_model = advanced_model
+    socketio.emit('log', {'message': f'Switched to {model_type} model'})
+    return jsonify({'message': f'Switched to {model_type} model'})
+
 # Load Fashion-MNIST dataset
 def load_fashion_mnist(limit_per_class=1000, validation_split=0.2):
     transform = transforms.Compose([transforms.ToTensor()])
@@ -85,20 +158,20 @@ def load_fashion_mnist(limit_per_class=1000, validation_split=0.2):
     return (np.array(train_data), np.array(train_targets)), (np.array(val_data), np.array(val_targets))
 
 # Training loop
-def train(model, criterion, optimizer, train_dataloader, val_dataloader=None, epochs=100):
+def train(current_model, criterion, optimizer, train_dataloader, val_dataloader=None, epochs=100):
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-    model.to(device)
+    current_model.to(device)
     training_metrics = {'epoch': [], 'training_loss': [], 'validation_loss': [], 'training_accuracy': [], 'validation_accuracy': []}
     
     for epoch in range(epochs):
-        model.train()
+        current_model.train()
         train_loss = 0.0
         train_correct = 0
         train_total = 0
         
         for inputs, targets in train_dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
-            outputs = model(inputs)
+            outputs = current_model(inputs)
             loss = criterion(outputs, targets)
             
             optimizer.zero_grad()
@@ -117,13 +190,13 @@ def train(model, criterion, optimizer, train_dataloader, val_dataloader=None, ep
         val_loss = 0.0
         val_accuracy = 0.0
         if val_dataloader is not None:
-            model.eval()
+            current_model.eval()
             val_correct = 0
             val_total = 0
             with torch.no_grad():
                 for inputs, targets in val_dataloader:
                     inputs, targets = inputs.to(device), targets.to(device)
-                    outputs = model(inputs)
+                    outputs = current_model(inputs)
                     loss = criterion(outputs, targets)
                     
                     val_loss += loss.item()
@@ -149,7 +222,7 @@ def train(model, criterion, optimizer, train_dataloader, val_dataloader=None, ep
             socketio.emit('log', {'message': log_message})
             socketio.emit('training_metrics', training_metrics)
     
-    model.cpu()
+    current_model.cpu()
 
 @app.route('/')
 def index():
@@ -161,27 +234,30 @@ def predict():
     input_grid = request.json['inputGrid']
     input_tensor = torch.tensor(np.array(input_grid).flatten()[np.newaxis, :], dtype=torch.float32)
     with torch.no_grad():
-        hidden_activations = model.activation(model.hidden(input_tensor.view(-1, 28*28))).numpy()
-        output_activations = model(input_tensor).numpy()
+        if isinstance(current_model, SimpleNN):
+            hidden_activations = current_model.activation(current_model.hidden(input_tensor.view(-1, 28*28))).numpy()
+        else:
+            hidden_activations = current_model.get_activation_distribution(input_tensor)
+        output_activations = current_model(input_tensor).numpy()
 
     predicted_class = int(np.argmax(output_activations))
     result = {
         'predictedClass': predicted_class,
-        'hiddenActivations': hidden_activations.tolist(),
+        'hiddenActivations': hidden_activations if isinstance(hidden_activations, list) else hidden_activations.tolist(),
         'outputActivations': output_activations.tolist()
     }
     return jsonify(result)
 
 @app.route('/confusion_matrix', methods=['GET'])
 def get_confusion_matrix():
-    global model, train_data, train_targets, val_data, val_targets
-    model.eval()
+    global current_model, train_data, train_targets, val_data, val_targets
+    current_model.eval()
     with torch.no_grad():
         # Combine train and validation data for the confusion matrix
         all_data = np.concatenate((train_data, val_data), axis=0)
         all_targets = np.concatenate((train_targets, val_targets), axis=0)
         
-        outputs = model(torch.tensor(all_data, dtype=torch.float32))
+        outputs = current_model(torch.tensor(all_data, dtype=torch.float32))
         _, predicted = torch.max(outputs, 1)
     cm = confusion_matrix(all_targets, predicted.numpy())
     return jsonify({'confusionMatrix': cm.tolist()})
@@ -200,7 +276,7 @@ def upload_image():
 
 @app.route('/train', methods=['POST'])
 def train_model():
-    global model, train_data, train_targets, val_data, val_targets
+    global current_model, train_data, train_targets, val_data, val_targets
     epochs = int(request.json['epochs'])
 
     train_dataset = TensorDataset(torch.tensor(train_data, dtype=torch.float32), torch.tensor(train_targets, dtype=torch.long))
@@ -210,10 +286,10 @@ def train_model():
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(current_model.parameters(), lr=0.001)
 
-    train(model, criterion, optimizer, train_dataloader, val_dataloader, epochs)
-    model.eval()
+    train(current_model, criterion, optimizer, train_dataloader, val_dataloader, epochs)
+    current_model.eval()
     
     # Get updated validation data
     updated_validation_data = get_latest_validation_data()
@@ -225,8 +301,8 @@ def train_model():
 
 @app.route('/clear', methods=['POST'])
 def clear_model_data():
-    global model
-    model = SimpleNN(args.hidden_neurons, 10)
+    global current_model
+    current_model = SimpleNN(args.hidden_neurons, 10)
     socketio.emit('log', {'message': 'Model data cleared'})
     return jsonify({'message': 'Model data cleared'})
 
@@ -246,13 +322,13 @@ def get_training_data():
     return jsonify({'trainingData': training_data})
 
 def get_latest_validation_data():
-    global model, val_data, val_targets
+    global current_model, val_data, val_targets
     validation_data = []
-    model.eval()
+    current_model.eval()
     with torch.no_grad():
         for img, target in zip(val_data, val_targets):
             img_tensor = torch.tensor(img, dtype=torch.float32).unsqueeze(0)
-            output = model(img_tensor)
+            output = current_model(img_tensor)
             predicted = output.argmax().item()
             is_correct = int(predicted == target)  # Convert boolean to int
 
@@ -275,7 +351,7 @@ def get_validation_data():
 
 @app.route('/train_single', methods=['POST'])
 def train_single_example():
-    global model
+    global current_model
     data = request.json
     input_grid = np.array(data['inputGrid'])
     class_label = data['classLabel']
@@ -287,11 +363,11 @@ def train_single_example():
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(current_model.parameters(), lr=0.001)
 
-    train(model, criterion, optimizer, train_dataloader, epochs=1)
+    train(current_model, criterion, optimizer, train_dataloader, epochs=1)
     socketio.emit('log', {'message': f'Trained on single example of class {fashion_mnist_labels[class_label]}'})
-    model.eval()
+    current_model.eval()
     
     # Get updated validation data
     updated_validation_data = get_latest_validation_data()
@@ -327,26 +403,55 @@ def get_network_visualization():
     input_tensor = torch.tensor(np.array(input_grid).flatten()[np.newaxis, :], dtype=torch.float32)
 
     with torch.no_grad():
-        hidden_activations = model.activation(model.hidden(input_tensor.view(-1, 28*28))).numpy()
-        output_activations = model(input_tensor).numpy()
+        if isinstance(current_model, SimpleNN):
+            hidden_activations = current_model.activation(current_model.hidden(input_tensor.view(-1, 28*28)))
+            output_activations = current_model(input_tensor)
+            hidden_weights = current_model.hidden.weight.data
+            output_weights = current_model.output.weight.data
+            conv1_activations = None
+            conv2_activations = None
+            conv1_weights = None
+            conv2_weights = None
+            fc1_weights = None
+            fc2_weights = None
+        elif isinstance(current_model, FashionMNISTNet):
+            x = input_tensor.view(-1, 1, 28, 28)
+            conv1_activations = F.relu(current_model.conv1(x))
+            conv2_activations = F.relu(current_model.conv2(conv1_activations))
+            pooled = F.max_pool2d(conv2_activations, 2)
+            flattened = torch.flatten(pooled, 1)
+            fc1_activations = F.relu(current_model.fc1(flattened))
+            output_activations = current_model(input_tensor)
+            
+            hidden_activations = fc1_activations
+            hidden_weights = current_model.fc1.weight.data
+            output_weights = current_model.fc2.weight.data
 
-    hidden_weights = model.hidden.weight.data.numpy()
-    output_weights = model.output.weight.data.numpy()
+            conv1_weights = current_model.conv1.weight.data
+            conv2_weights = current_model.conv2.weight.data
+            fc1_weights = current_model.fc1.weight.data
+            fc2_weights = current_model.fc2.weight.data
 
     return jsonify({
         'inputActivations': input_tensor.flatten().tolist(),
-        'hiddenActivations': hidden_activations.tolist(),
-        'outputActivations': output_activations.tolist(),
-        'hiddenWeights': hidden_weights.tolist(),
-        'outputWeights': output_weights.tolist()
+        'hiddenActivations': hidden_activations.flatten().tolist(),
+        'outputActivations': output_activations.flatten().tolist(),
+        'hiddenWeights': hidden_weights.flatten().tolist(),
+        'outputWeights': output_weights.flatten().tolist(),
+        'conv1Activations': conv1_activations.flatten().tolist() if conv1_activations is not None else None,
+        'conv2Activations': conv2_activations.flatten().tolist() if conv2_activations is not None else None,
+        'conv1Weights': conv1_weights.flatten().tolist() if conv1_weights is not None else None,
+        'conv2Weights': conv2_weights.flatten().tolist() if conv2_weights is not None else None,
+        'fc1Weights': fc1_weights.flatten().tolist() if fc1_weights is not None else None,
+        'fc2Weights': fc2_weights.flatten().tolist() if fc2_weights is not None else None,
     })
 
 @app.route('/update_hidden_neurons', methods=['POST'])
 def update_hidden_neurons():
-    global model
+    global current_model
     new_hidden_neurons = int(request.json['hiddenNeurons'])
-    model = SimpleNN(hidden_neurons=new_hidden_neurons, output_neurons=10)
-    model.eval()
+    current_model = SimpleNN(hidden_neurons=new_hidden_neurons, output_neurons=10)
+    current_model.eval()
     socketio.emit('log', {'message': f'Updated hidden neurons to {new_hidden_neurons}'})
     return jsonify({'message': f'Updated hidden neurons to {new_hidden_neurons}'})
 
@@ -355,11 +460,11 @@ def get_distributions():
     input_grid = request.json['inputGrid']
     input_tensor = torch.tensor(np.array(input_grid).flatten()[np.newaxis, :], dtype=torch.float32)
 
-    weights, biases = model.get_weight_bias_distributions()
-    activations = model.get_activation_distribution(input_tensor)
+    weights, biases = current_model.get_weight_bias_distributions()
+    activations = current_model.get_activation_distribution(input_tensor)
     
     with torch.no_grad():
-        output = model(input_tensor)
+        output = current_model(input_tensor)
         confidence = torch.nn.functional.softmax(output, dim=1).flatten().tolist()
 
     def create_histogram(data, title):
@@ -384,16 +489,7 @@ def get_distributions():
     })
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Train a simple neural network on the Fashion-MNIST dataset.')
-    parser.add_argument('--hidden_neurons', type=int, default=24, help='Number of neurons in the hidden layer (default: 24)')
-    parser.add_argument('--limit_per_class', type=int, default=250, help='Number of samples per class for training (default: 200)')
-
-    args = parser.parse_args()
-
     (train_data, train_targets), (val_data, val_targets) = load_fashion_mnist(limit_per_class=args.limit_per_class)
-
-    model = SimpleNN(hidden_neurons=args.hidden_neurons, output_neurons=10)
-    model.eval()
 
     training_metrics = {'epoch': [], 'training_loss': [], 'validation_loss': [], 'training_accuracy': [], 'validation_accuracy': []}
 

@@ -12,6 +12,33 @@ $(document).ready(function() {
     let trainingAccuracyChart;
     let validationAccuracyChart;
 
+    let currentModel = 'simple';
+
+    predict();
+    updateSwitchButtonText();
+
+    $('#switchModelButton').click(function() {
+        const newModel = currentModel === 'simple' ? 'advanced' : 'simple';
+        $.ajax({
+            url: '/switch_model',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ modelType: newModel }),
+            success: function(response) {
+                console.log(response.message);
+                currentModel = newModel;
+                updateSwitchButtonText();
+                alert(`Switched to ${currentModel} model`);
+                predict();  // Update the prediction with the new model
+            }
+        });
+    });
+
+    function updateSwitchButtonText() {
+        const buttonText = currentModel === 'simple' ? 'Switch to Advanced Model' : 'Switch to Simple Model';
+        $('#switchModelButton').html(`<i class="fas fa-exchange-alt"></i> ${buttonText}`);
+    }
+
     function updateDistributions() {
         $.ajax({
             url: '/distributions',
@@ -53,66 +80,122 @@ $(document).ready(function() {
         
         // Set canvas size
         canvas.width = 1000;
-        canvas.height = 1024;
+        canvas.height = 600;
         
-        // Define neuron positions
-        var inputNeurons = data.inputActivations.length;
-        var hiddenNeurons = data.hiddenActivations[0].length;
-        var outputNeurons = data.outputActivations[0].length;
-        
-        var inputLayer = Array.from({length: inputNeurons}, (_, i) => ({x: 150, y: 20 + i * (960 / inputNeurons)}));
-        var hiddenLayer = Array.from({length: hiddenNeurons}, (_, i) => ({x: 500, y: 330 + i * (360 / hiddenNeurons)}));
-        var outputLayer = Array.from({length: outputNeurons}, (_, i) => ({x: 850, y: 320 + i * (360 / outputNeurons)}));
-        
-        // Draw connections
-        for (let i = 0; i < inputNeurons; i++) {
-            for (let j = 0; j < hiddenNeurons; j++) {
-                drawConnection(ctx, inputLayer[i], hiddenLayer[j], data.hiddenWeights[j][i]);
-            }
+        if (currentModel === 'simple') {
+            // Draw simple model
+            var inputNeurons = 28 * 28;
+            var hiddenNeurons = data.hiddenActivations.length;
+            var outputNeurons = data.outputActivations.length;
+            
+            var inputLayer = Array.from({length: inputNeurons}, (_, i) => ({x: 50, y: 20 + i * (560 / inputNeurons)}));
+            var hiddenLayer = Array.from({length: hiddenNeurons}, (_, i) => ({x: 500, y: 20 + i * (560 / hiddenNeurons)}));
+            var outputLayer = Array.from({length: outputNeurons}, (_, i) => ({x: 950, y: 20 + i * (560 / outputNeurons)}));
+            
+            // Draw connections
+            drawLayerConnections(ctx, inputLayer, hiddenLayer, data.hiddenWeights);
+            drawLayerConnections(ctx, hiddenLayer, outputLayer, data.outputWeights);
+
+            
+            // Draw neurons
+            drawNeurons(ctx, inputLayer, data.inputActivations);
+            drawNeurons(ctx, hiddenLayer, data.hiddenActivations);
+            drawNeurons(ctx, outputLayer, data.outputActivations);
+        } else {
+            // Draw advanced model
+            var inputNeurons = 28 * 28;
+            var conv1Neurons = data.conv1Activations ? Math.min(data.conv1Activations.length, 32) : 0;
+            var conv2Neurons = data.conv2Activations ? Math.min(data.conv2Activations.length, 64) : 0;
+            var fc1Neurons = data.hiddenActivations ? Math.min(data.hiddenActivations.length, 128) : 0;
+            var outputNeurons = data.outputActivations ? data.outputActivations.length : 0;
+            
+            var inputLayer = Array.from({length: inputNeurons}, (_, i) => ({x: 50, y: 20 + i * (560 / inputNeurons)}));
+            var conv1Layer = Array.from({length: conv1Neurons}, (_, i) => ({x: 250, y: 20 + i * (560 / conv1Neurons)}));
+            var conv2Layer = Array.from({length: conv2Neurons}, (_, i) => ({x: 450, y: 20 + i * (560 / conv2Neurons)}));
+            var fc1Layer = Array.from({length: fc1Neurons}, (_, i) => ({x: 650, y: 20 + i * (560 / fc1Neurons)}));
+            var outputLayer = Array.from({length: outputNeurons}, (_, i) => ({x: 850, y: 20 + i * (560 / outputNeurons)}));
+            
+            // Draw connections
+            drawLayerConnections(ctx, inputLayer, conv1Layer, data.conv1Weights);
+            drawLayerConnections(ctx, conv1Layer, conv2Layer, data.conv2Weights);
+            drawLayerConnections(ctx, conv2Layer, fc1Layer, data.fc1Weights);
+            drawLayerConnections(ctx, fc1Layer, outputLayer, data.fc2Weights);
+
+            // Draw neurons
+            drawNeurons(ctx, inputLayer, data.inputActivations);
+            if (data.conv1Activations) drawNeurons(ctx, conv1Layer, data.conv1Activations);
+            if (data.conv2Activations) drawNeurons(ctx, conv2Layer, data.conv2Activations);
+            if (data.hiddenActivations) drawNeurons(ctx, fc1Layer, data.hiddenActivations);
+            if (data.outputActivations) drawNeurons(ctx, outputLayer, data.outputActivations);
         }
-        
-        for (let i = 0; i < hiddenNeurons; i++) {
-            for (let j = 0; j < outputNeurons; j++) {
-                drawConnection(ctx, hiddenLayer[i], outputLayer[j], data.outputWeights[j][i]);
-            }
-        }
-        
-        // Draw neurons
-        drawNeurons(ctx, inputLayer, data.inputActivations);
-        drawNeurons(ctx, hiddenLayer, data.hiddenActivations[0]);
-        drawNeurons(ctx, outputLayer, data.outputActivations[0]);
     }
     
-    function drawConnection(ctx, start, end, weight) {
-        ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
-        ctx.strokeStyle = getWeightColor(weight);
-        ctx.lineWidth = Math.abs(weight) * 2;
-        ctx.stroke();
-    }
-    
-    function drawNeurons(ctx, neurons, activations) {
-        neurons.forEach((neuron, i) => {
-            ctx.beginPath();
-            ctx.arc(neuron.x, neuron.y, 7, 0, 2 * Math.PI);
-            ctx.fillStyle = getActivationColor(activations[i]);
-            ctx.fill();
-        });
+    function drawLayerConnections(ctx, layer1, layer2, weights) {
+        const connectionsPerNeuron = 5; // Adjust this value to increase/decrease density of connections
+        
+        //console.log("Weights:", weights); // Log the weights
+
+        if (!weights || weights.length === 0) {
+            console.log("No weights provided, using default");
+            weights = Array(layer1.length * layer2.length).fill(0);
+        }
+        
+        for (let i = 0; i < layer1.length; i++) {
+            for (let j = 0; j < connectionsPerNeuron; j++) {
+                const targetIndex = Math.floor(Math.random() * layer2.length);
+                const weightIndex = i * layer2.length + targetIndex;
+                const weight = weights[weightIndex] || 0;
+                
+                ctx.beginPath();
+                ctx.moveTo(layer1[i].x, layer1[i].y);
+                ctx.lineTo(layer2[targetIndex].x, layer2[targetIndex].y);
+                
+                ctx.strokeStyle = getWeightColor(weight);
+                ctx.lineWidth = Math.abs(weight) * 2 + 0.5; // Adjust line width based on weight magnitude
+                ctx.stroke();
+            }
+        }
     }
     
     function getWeightColor(weight) {
-        var r = weight > 0 ? 255 : 0;
-        var b = weight < 0 ? 255 : 0;
-        var g = 0;
-        var a = Math.min(Math.abs(weight), 1);
-        return `rgba(${r},${g},${b},${a})`;
+        // Amplify the weight to make colors more visible
+        const amplifiedWeight = weight * 10;
+        const normalizedWeight = Math.tanh(amplifiedWeight);
+        
+        let r, g, b;
+        if (normalizedWeight < 0) {
+            // Negative weights: blue
+            r = 0;
+            g = 0;
+            b = Math.round(255 * (-normalizedWeight));
+        } else {
+            // Positive weights: red
+            r = Math.round(255 * normalizedWeight);
+            g = 0;
+            b = 0;
+        }
+        
+        // Increase base alpha to make lines more visible
+        const alpha = Math.abs(normalizedWeight) * 0.5 + 0.2;
+        
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    
+    function drawNeurons(ctx, neurons, activations) {
+        if (!activations) return;  // Skip if activations are undefined
+        neurons.forEach((neuron, i) => {
+            ctx.beginPath();
+            ctx.arc(neuron.x, neuron.y, 3, 0, 2 * Math.PI);
+            var activation = activations[i] || 0;  // Use 0 if activation is undefined
+            ctx.fillStyle = getActivationColor(activation);
+            ctx.fill();
+        });
     }
     
     function getActivationColor(activation) {
         var r = Math.round(activation * 255);
         var g = 0;        
-        var b = Math.round(activation * 255);
+        var b = Math.round((1 - activation) * 255);
         return `rgb(${r},${g},${b})`;
     }
     
@@ -260,9 +343,6 @@ $(document).ready(function() {
         var index = Math.round(invertedIndex * 6) + 1; // Scale to [1,7]
         return Math.max(1, Math.min(7, index)); // Ensures the index stays within the range of available images
     }
-    
-    
-    
 
     function predict() {
         $.ajax({
