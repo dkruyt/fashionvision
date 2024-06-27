@@ -19,6 +19,19 @@ from torch.utils.data.sampler import SubsetRandomSampler
 app = Flask(__name__)
 socketio = SocketIO(app)
 
+fashion_mnist_labels = {
+    0: 'T-shirt/top',
+    1: 'Trouser',
+    2: 'Pullover',
+    3: 'Dress',
+    4: 'Coat',
+    5: 'Sandal',
+    6: 'Shirt',
+    7: 'Sneaker',
+    8: 'Bag',
+    9: 'Ankle boot'
+}
+
 # Define the neural network model
 class SimpleNN(nn.Module):
     def __init__(self, hidden_neurons=128, output_neurons=10):
@@ -219,14 +232,17 @@ def clear_model_data():
 
 @app.route('/training_data', methods=['GET'])
 def get_training_data():
-    global train_data
+    global train_data, train_targets
     training_data = []
-    for img in train_data:
+    for img, label in zip(train_data, train_targets):
         img = Image.fromarray((img.reshape(28, 28) * 255).astype(np.uint8))
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        training_data.append(img_str)
+        training_data.append({
+            'image': img_str,
+            'label': fashion_mnist_labels[int(label)]
+        })
     return jsonify({'trainingData': training_data})
 
 def get_latest_validation_data():
@@ -246,8 +262,8 @@ def get_latest_validation_data():
             img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
             validation_data.append({
                 'image': img_str,
-                'predicted': int(predicted),
-                'actual': int(target.item()),
+                'predicted': fashion_mnist_labels[int(predicted)],
+                'actual': fashion_mnist_labels[int(target.item())],
                 'is_correct': is_correct
             })
     return validation_data
@@ -274,14 +290,14 @@ def train_single_example():
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     train(model, criterion, optimizer, train_dataloader, epochs=1)
-    socketio.emit('log', {'message': f'Trained on single example of class {class_label}'})
+    socketio.emit('log', {'message': f'Trained on single example of class {fashion_mnist_labels[class_label]}'})
     model.eval()
     
     # Get updated validation data
     updated_validation_data = get_latest_validation_data()
     
     return jsonify({
-        'message': f'Trained on single example of class {class_label}',
+        'message': f'Trained on single example of class {fashion_mnist_labels[class_label]}',
         'validationData': updated_validation_data
     })
 
@@ -369,8 +385,8 @@ def get_distributions():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a simple neural network on the Fashion-MNIST dataset.')
-    parser.add_argument('--hidden_neurons', type=int, default=128, help='Number of neurons in the hidden layer (default: 128)')
-    parser.add_argument('--limit_per_class', type=int, default=200, help='Number of samples per class for training (default: 100)')
+    parser.add_argument('--hidden_neurons', type=int, default=24, help='Number of neurons in the hidden layer (default: 24)')
+    parser.add_argument('--limit_per_class', type=int, default=250, help='Number of samples per class for training (default: 200)')
 
     args = parser.parse_args()
 

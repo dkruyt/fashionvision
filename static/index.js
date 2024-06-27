@@ -320,7 +320,7 @@ $(document).ready(function() {
         var trainingHtml = '';
         for (var i = 0; i < trainingData.length; i++) {
             var img = trainingData[i];
-            var imgHtml = '<img src="data:image/png;base64,' + img + '" width="28" height="28" data-index="' + i + '">';
+            var imgHtml = '<img src="data:image/png;base64,' + img.image + '" width="28" height="28" data-index="' + i + '" title="Class: ' + img.label + '">';
             trainingHtml += imgHtml;
         }
         $('#trainingData').html(trainingHtml);
@@ -358,11 +358,8 @@ $(document).ready(function() {
                                <img src="data:image/png;base64,${item.image}" 
                                     width="28" height="28" 
                                     data-index="${i}" 
-                                    class="validation-image ${borderClass}">
-                               <!-- <div class="validation-info">
-                                   Predicted: ${item.predicted}<br>
-                                   Actual: ${item.actual}
-                               </div> -->
+                                    class="validation-image ${borderClass}"
+                                    title="Predicted: ${item.predicted}\nActual: ${item.actual}">
                            </div>`;
             validationHtml += imgHtml;
         }
