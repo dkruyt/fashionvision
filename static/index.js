@@ -314,10 +314,27 @@ $(document).ready(function() {
 
     function updateActivations(hiddenActivations, outputActivations) {
         var hiddenHtml = '';
-        for (var i = 0; i < hiddenActivations[0].length; i++) {
-            var activation = hiddenActivations[0][i];
-            var imageIndex = getImageIndex(activation);
-            hiddenHtml += '<div class="neuron hidden-neuron" style="background-image: url(\'static/images/' + imageIndex + '.svg\');" data-index="' + i + '"><span>' + activation.toFixed(2) + '</span></div>';
+        
+        if (currentModel === 'simple') {
+            // Existing code for simple model
+            for (var i = 0; i < hiddenActivations[0].length; i++) {
+                var activation = hiddenActivations[0][i];
+                var imageIndex = getImageIndex(activation);
+                hiddenHtml += '<div class="neuron hidden-neuron" style="background-image: url(\'static/images/' + imageIndex + '.svg\');" data-index="' + i + '"><span>' + activation.toFixed(2) + '</span></div>';
+            }
+        } else {
+            // For advanced model, show a summary
+            hiddenHtml = `
+                <div class="advanced-model-summary">
+                    <ul>
+                        <li>Conv1: 32 filters (3x3)</li>
+                        <li>Conv2: 64 filters (3x3)</li>
+                        <li>MaxPool: 2x2</li>
+                        <li>Dropout: 25%</li>
+                        <li>FC: 128 neurons</li>
+                    </ul>
+                </div>
+            `;
         }
         $('#hiddenLayer').html(hiddenHtml);
     
