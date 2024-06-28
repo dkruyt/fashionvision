@@ -14,8 +14,15 @@ $(document).ready(function() {
 
     let currentModel = 'simple';
 
+    let lossChart;
+    let accuracyChart;
+
     predict();
     updateSwitchButtonText();
+    drawInputGrid();
+    drawExtendedLine();
+    initializeCharts();
+
 
     $('#switchModelButton').click(function() {
         const newModel = currentModel === 'simple' ? 'advanced' : 'simple';
@@ -549,13 +556,12 @@ $(document).ready(function() {
         });
     }
 
+
     function initializeCharts() {
-        var ctx1 = document.getElementById('trainingLossChart').getContext('2d');
-        var ctx2 = document.getElementById('validationLossChart').getContext('2d');
-        var ctx3 = document.getElementById('trainingAccuracyChart').getContext('2d');
-        var ctx4 = document.getElementById('validationAccuracyChart').getContext('2d');
+        var ctxLoss = document.getElementById('lossChart').getContext('2d');
+        var ctxAccuracy = document.getElementById('accuracyChart').getContext('2d');
         
-        trainingLossChart = new Chart(ctx1, {
+        lossChart = new Chart(ctxLoss, {
             type: 'line',
             data: {
                 labels: [],
@@ -565,21 +571,8 @@ $(document).ready(function() {
                     borderColor: 'rgba(75, 192, 192, 1)',
                     borderWidth: 1,
                     fill: false
-                }]
-            },
-            options: {
-                scales: {
-                    x: { beginAtZero: true },
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-        
-        validationLossChart = new Chart(ctx2, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
+                },
+                {
                     label: 'Validation Loss',
                     data: [],
                     borderColor: 'rgba(153, 102, 255, 1)',
@@ -595,7 +588,7 @@ $(document).ready(function() {
             }
         });
         
-        trainingAccuracyChart = new Chart(ctx3, {
+        accuracyChart = new Chart(ctxAccuracy, {
             type: 'line',
             data: {
                 labels: [],
@@ -605,21 +598,8 @@ $(document).ready(function() {
                     borderColor: 'rgba(54, 162, 235, 1)',
                     borderWidth: 1,
                     fill: false
-                }]
-            },
-            options: {
-                scales: {
-                    x: { beginAtZero: true },
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-        
-        validationAccuracyChart = new Chart(ctx4, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
+                },
+                {
                     label: 'Validation Accuracy',
                     data: [],
                     borderColor: 'rgba(255, 159, 64, 1)',
@@ -665,21 +645,15 @@ $(document).ready(function() {
     }
 
     function updateCharts(metrics) {
-        trainingLossChart.data.labels = metrics.epoch;
-        trainingLossChart.data.datasets[0].data = metrics.training_loss;
-        trainingLossChart.update();
+        lossChart.data.labels = metrics.epoch;
+        lossChart.data.datasets[0].data = metrics.training_loss;
+        lossChart.data.datasets[1].data = metrics.validation_loss;
+        lossChart.update();
         
-        validationLossChart.data.labels = metrics.epoch;
-        validationLossChart.data.datasets[0].data = metrics.validation_loss;
-        validationLossChart.update();
-        
-        trainingAccuracyChart.data.labels = metrics.epoch;
-        trainingAccuracyChart.data.datasets[0].data = metrics.training_accuracy;
-        trainingAccuracyChart.update();
-        
-        validationAccuracyChart.data.labels = metrics.epoch;
-        validationAccuracyChart.data.datasets[0].data = metrics.validation_accuracy;
-        validationAccuracyChart.update();
+        accuracyChart.data.labels = metrics.epoch;
+        accuracyChart.data.datasets[0].data = metrics.training_accuracy;
+        accuracyChart.data.datasets[1].data = metrics.validation_accuracy;
+        accuracyChart.update();
     }
 
     canvas.addEventListener('mousedown', function(e) {
@@ -726,7 +700,5 @@ $(document).ready(function() {
         $('#graphsModal').modal('show');
     });
 
-    drawInputGrid();
-    drawExtendedLine();
-    initializeCharts();
+
 });
