@@ -392,6 +392,7 @@ $(document).ready(function() {
         $('#result').text('');
         $('#hiddenLayer').empty();
         $('#outputLayer').empty();
+        predict();
     }
 
     function trainModel(epochs) {

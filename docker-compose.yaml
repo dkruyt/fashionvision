@@ -8,5 +8,5 @@ services:
     ports:
       - "8000:8000"
     environment:
-      HIDDEN_NEURONS: 128
-      LIMIT_PER_CLASS: 100
+      HIDDEN_NEURONS: 24
+      LIMIT_PER_CLASS: 200
