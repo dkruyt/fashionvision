@@ -20,26 +20,40 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .neuron {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 60px; /* Increased size */
+            height: 60px; /* Increased size */
+            border-radius: 30px; /* Adjusted for larger size */
             text-align: center;
-            line-height: 40px;
-            margin: 5px;
-            font-size: 10px;
-            color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-size: 12px;
+            color: black; /* Changed for better visibility */
+            background-size: cover; /* Ensure SVG covers the whole area */
+            position: relative;
             cursor: pointer;
             transition: transform 0.2s;
+            overflow: hidden; /* Ensures nothing spills out */
+        }
+
+        .neuron span {
+            position: absolute;
+            z-index: 2; /* Ensures text appears above the background image */
+            color: black; /* Color of the text */
+            font-weight: normal;
+            background: rgba(255, 255, 255, 0.3); /* White with 50% opacity */
+            padding: 1px 2px; /* Small padding around the text */
+            border-radius: 2px; /* Rounded corners for the background */
+            text-align: center;
+            width: 100%; /* Ensures the background extends across the neuron */
         }
         .neuron:hover {
-            transform: scale(1.2);
+            transform: scale(1.3);
         }
         .neuron-container {
             display: inline-block;
             text-align: center;
-            margin: 1px;
+            margin: -2px;
         }
         .neuron-number {
             margin-bottom: 5px;
@@ -80,7 +94,7 @@
             height: 200px;
             overflow-y: scroll;
             border: 1px solid #dee2e6;
-            padding: 15px;
+            padding: 10px;
             background-color: #ffffff;
             margin-top: 20px;
             border-radius: 5px;
@@ -95,6 +109,28 @@
             background-color: #3399cc;
             color: white;
             border-radius: 15px 15px 0 0 !important;
+        }
+        .hidden {
+        display: none;
+        }
+        .data-hidden {
+            display: none !important;
+        }
+        .small-input {
+        width: 80px;
+        display: inline-block;
+        }
+        .validation-image-container {
+        display: inline-block;
+        margin: 1px;
+        text-align: center;
+        }
+        .validation-image {
+        border: 2px solid;
+        margin-bottom: 1px;
+        }
+        .validation-info {
+        font-size: 10px;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -132,8 +168,11 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <button id="predictButton" class="btn btn-primary"><i class="fas fa-magic"></i> Predict</button>
+                            <input type="number" id="hiddenNeuronsInput" class="form-control small-input" value="24" min="1">
+                            <button id="updateHiddenNeuronsButton" class="btn btn-primary">Update Hidden Neurons</button>
                             <button id="clearButton" class="btn btn-secondary"><i class="fas fa-eraser"></i> Clear</button>
-                            <button id="prepareButton" class="btn btn-info"><i class="fas fa-database"></i> Load Data</button>
+                            <button id="dataButton" class="btn btn-info"><i class="fas fa-database"></i> Load Data</button>
+                            <button id="switchModelButton" class="btn btn-primary"><i class="fas fa-exchange-alt"></i> Switch to Advanced Model</button>
                             <button id="train1Button" class="btn btn-success"><i class="fas fa-graduation-cap"></i> Train 1x</button>
                             <button id="train10Button" class="btn btn-success"><i class="fas fa-graduation-cap"></i> Train 10x</button>
                             <button id="train100Button" class="btn btn-success"><i class="fas fa-graduation-cap"></i> Train 100x</button>
@@ -148,8 +187,14 @@
                         </div>
                         <div id="result" class="mt-3"></div>
                         <div id="logWindow" class="mt-3"></div>
-                        <h3 class="mt-4">Training Data</h3>
-                        <div id="trainingData" class="d-flex flex-wrap"></div>
+                        <div id="trainingDataSection">
+                            <h3 class="mt-4">Training Data</h3>
+                            <div id="trainingData" class="d-flex flex-wrap"></div>
+                        </div>
+                        <div id="validationDataSection">
+                            <h3 class="mt-4">Validation Data</h3>
+                            <div id="validationData" class="d-flex flex-wrap"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -251,25 +296,18 @@
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-6">
-                            <h3>Training Loss</h3>
-                            <canvas id="trainingLossChart"></canvas>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h3>Loss</h3>
+                                    <canvas id="lossChart"></canvas>
+                                </div>
+                                <div class="col-md-6">
+                                    <h3>Accuracy</h3>
+                                    <canvas id="accuracyChart"></canvas>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <h3>Validation Loss</h3>
-                            <canvas id="validationLossChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="row mt-4">
-                        <div class="col-md-6">
-                            <h3>Training Accuracy</h3>
-                            <canvas id="trainingAccuracyChart"></canvas>
-                        </div>
-                        <div class="col-md-6">
-                            <h3>Validation Accuracy</h3>
-                            <canvas id="validationAccuracyChart"></canvas>
-                        </div>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

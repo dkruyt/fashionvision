@@ -4,11 +4,9 @@ FashionVision is a Flask web application built on PyTorch that allows users to i
 
 ## Features
 
-- **Interactive Digit Drawing:** Draw digits on a grid to test the neural network's predictions.
+- **Interactive Fashion Drawing:** Draw Fashion on a grid to test the neural network's predictions or upload a image.
 - **Real-Time Training:** Train the neural network on the Fashion-MNIST dataset and visualize training progress in real-time.
 - **Metrics Visualization:** View training and validation loss and accuracy in a popup graph.
-- **Model Management:** Save and load trained models for later use.
-- **Hyperparameter Tuning:** Adjust training parameters like learning rate and batch size through the UI.
 - **Confusion Matrix:** Visualize the model's performance using a confusion matrix.
 
 ## Screenshots
@@ -18,6 +16,12 @@ FashionVision is a Flask web application built on PyTorch that allows users to i
 
 ![Graphs Modal](screenshots/graphs.png)
 *Description: Popup window displaying training and validation metrics.*
+
+![Confusion Matrix](screenshots/matrix.png)
+*Description: Popup window displaying the confusion matrix for the trained model.*
+
+![Neural Network Visualization](screenshots/netviz.png)
+*Description: Popup window visualizing the structure and weights of the neural network.*
 
 ## Getting Started
 
@@ -77,10 +81,8 @@ digitvision/
 
 The `docker-compose.yaml` file is configured to build and run the application with the following default environment variables:
 
-- `HIDDEN_NEURONS`: Number of neurons in the hidden layer (default: 8)
-- `LIMIT_PER_DIGIT`: Number of digits per class for training (default: 16)
-- `NUM_CLASSES`: Number of output neurons and number of digit classes (default: 10)
-
+- `HIDDEN_NEURONS`: Number of neurons in the hidden layer (default: 24)
+- `LIMIT_PER_CLASS`: Number of output neurons and number of digit classes (default: 200)
 These values can be adjusted by editing the `docker-compose.yaml` file.
 
 ### Contributing
