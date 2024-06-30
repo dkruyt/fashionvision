@@ -336,7 +336,7 @@ $(document).ready(function() {
     
     function drawInputGrid() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    
         // Draw the coordinate numbers
         ctx.fillStyle = 'black';
         ctx.font = '12px Arial';
@@ -344,16 +344,27 @@ $(document).ready(function() {
             ctx.fillText(i, i * CELL_SIZE + CELL_SIZE / 2 - 5, 10);  // Top coordinates
             ctx.fillText(i, 5, i * CELL_SIZE + CELL_SIZE / 2 + 5);  // Left coordinates
         }
-
+    
         // Draw the grid cells
         for (var i = 0; i < GRID_SIZE; i++) {
             for (var j = 0; j < GRID_SIZE; j++) {
                 var value = inputGrid[i][j];
-                var color = 'rgb(' + Math.round(value * 255) + ', ' + Math.round(value * 255) + ', ' + Math.round(value * 255) + ')';
+                var color = `rgb(${Math.round(value * 255)}, ${Math.round(value * 255)}, ${Math.round(value * 255)})`;
                 ctx.fillStyle = color;
                 ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
             }
         }
+    
+        // Draw grid lines
+        ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';  // Light grey with low opacity
+        ctx.beginPath();
+        for (var i = 0; i <= GRID_SIZE; i++) {
+            ctx.moveTo(i * CELL_SIZE, 0);
+            ctx.lineTo(i * CELL_SIZE, canvas.height);
+            ctx.moveTo(0, i * CELL_SIZE);
+            ctx.lineTo(canvas.width, i * CELL_SIZE);
+        }
+        ctx.stroke();
     }
 
     function drawExtendedLine() {
@@ -731,7 +742,7 @@ $(document).ready(function() {
     });
     
     function displayConfusionMatrix(confusionMatrix) {
-        var labels = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'];
+        var labels = Object.values(currentLabels);
         var data = [{
             z: confusionMatrix,
             x: labels,
@@ -741,10 +752,44 @@ $(document).ready(function() {
         }];
         var layout = {
             title: 'Confusion Matrix',
-            xaxis: {title: 'Predicted'},
-            yaxis: {title: 'Actual'}
+            width: 800,  // Increased width
+            height: 800, // Increased height
+            xaxis: {
+                title: 'Predicted',
+                tickangle: -45, // Rotate x-axis labels for better readability
+            },
+            yaxis: {
+                title: 'Actual',
+            },
+            margin: {
+                l: 100, // Increased left margin for y-axis labels
+                r: 50,
+                b: 150, // Increased bottom margin for x-axis labels
+                t: 100, // Increased top margin for title
+                pad: 4
+            },
+            annotations: []
         };
-        Plotly.newPlot('confusionMatrixContainer', data, layout);
+    
+        // Add text annotations to each cell
+        for (var i = 0; i < confusionMatrix.length; i++) {
+            for (var j = 0; j < confusionMatrix[i].length; j++) {
+                var currentValue = confusionMatrix[i][j];
+                if (currentValue > 0) {
+                    layout.annotations.push({
+                        x: labels[j],
+                        y: labels[i],
+                        text: currentValue,
+                        font: {
+                            color: 'white'
+                        },
+                        showarrow: false
+                    });
+                }
+            }
+        }
+    
+        Plotly.newPlot('confusionMatrixContainer', data, layout, {displayModeBar: false});
     }
 
     function updateCharts(metrics) {
@@ -803,5 +848,72 @@ $(document).ready(function() {
         $('#graphsModal').modal('show');
     });
 
+    //Drawing
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    
+    function startDrawing(e) {
+        isDrawing = true;
+        [lastX, lastY] = getMousePos(canvas, e);
+        draw(e);  // This allows a single click to draw a point
+    }
+    
+    function stopDrawing() {
+        isDrawing = false;
+    }
+    
+    function getMousePos(canvas, e) {
+        var rect = canvas.getBoundingClientRect();
+        return [
+            Math.floor((e.clientX - rect.left) / CELL_SIZE),
+            Math.floor((e.clientY - rect.top) / CELL_SIZE)
+        ];
+    }
+    
+    function draw(e) {
+        if (!isDrawing) return;
+    
+        var [currentX, currentY] = getMousePos(canvas, e);
+    
+        // Bresenham's line algorithm to ensure a continuous line
+        var dx = Math.abs(currentX - lastX);
+        var dy = Math.abs(currentY - lastY);
+        var sx = (lastX < currentX) ? 1 : -1;
+        var sy = (lastY < currentY) ? 1 : -1;
+        var err = dx - dy;
+    
+        while (true) {
+            setPixel(lastX, lastY);
+    
+            if ((lastX === currentX) && (lastY === currentY)) break;
+            var e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; lastX += sx; }
+            if (e2 < dx) { err += dx; lastY += sy; }
+        }
+    
+        lastX = currentX;
+        lastY = currentY;
+    }
+    
+    function setPixel(x, y) {
+        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+            inputGrid[y][x] = 0;  // Set to black (0)
+            drawInputGrid();
+            drawExtendedLine();
+        }
+    }
+
+    function stopDrawing() {
+        if (isDrawing) {
+            isDrawing = false;
+            predict();  // Predict after drawing is complete
+        }
+    }
 
 });

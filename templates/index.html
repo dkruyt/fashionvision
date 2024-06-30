@@ -132,6 +132,13 @@
         .validation-info {
         font-size: 10px;
         }
+        #confusionMatrixContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 850px; /* Slightly larger than the plot to account for any margins */
+            width: 100%;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -222,17 +229,14 @@
 
     <!-- Confusion Matrix Modal -->
     <div class="modal fade" id="confusionMatrixModal" tabindex="-1" aria-labelledby="confusionMatrixModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-xl"> <!-- Changed to modal-xl for extra large modal -->
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="confusionMatrixModalLabel">Confusion Matrix</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body d-flex justify-content-center align-items-center">
                     <div id="confusionMatrixContainer"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
