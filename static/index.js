@@ -80,6 +80,11 @@ $(document).ready(function() {
         $('#switchModelButton').html(`<i class="fas fa-exchange-alt"></i> ${buttonText}`);
     }
 
+    $('#distributionsButton').click(function() {
+        updateDistributions();
+        $('#distributionsModal').modal('show');
+    });
+
     function updateDistributions() {
         $.ajax({
             url: '/distributions',
@@ -87,10 +92,15 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ inputGrid: inputGrid }),
             success: function(response) {
+                console.log("Received distribution data:", response);
                 $('#weightHistogram').attr('src', 'data:image/png;base64,' + response.weightHist);
                 $('#biasHistogram').attr('src', 'data:image/png;base64,' + response.biasHist);
                 $('#activationHistogram').attr('src', 'data:image/png;base64,' + response.activationHist);
                 updateConfidenceChart(response.confidence);
+                console.log("Updated histograms and confidence chart");
+            },
+            error: function(xhr, status, error) {
+                console.error("Error fetching distributions:", error);
             }
         });
     }
@@ -293,10 +303,6 @@ $(document).ready(function() {
         });
     }
     
-    $('#distributionsButton').click(function() {
-        updateDistributions();
-        $('#distributionsModal').modal('show');
-    });
     $('#networkVisualizationButton').click(showNetworkVisualization);
 
     $('#uploadButton').click(function() {
@@ -369,13 +375,26 @@ $(document).ready(function() {
 
     function drawExtendedLine() {
         extendedLineCtx.clearRect(0, 0, extendedLineCanvas.width, extendedLineCanvas.height);
+        
+        const pixelWidth = 1;
+        const pixelHeight = 2;
+        const pixelsPerRow = Math.floor(extendedLineCanvas.width / pixelWidth);
+        const numRows = Math.ceil((GRID_SIZE * GRID_SIZE) / pixelsPerRow);
+    
         for (var i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
             var row = Math.floor(i / GRID_SIZE);
             var col = i % GRID_SIZE;
             var value = inputGrid[row][col];
-            var color = 'rgb(' + Math.round(value * 255) + ', ' + Math.round(value * 255) + ', ' + Math.round(value * 255) + ')';
+            
+            var colorValue = Math.round(value * 255);
+            var color = `rgb(${colorValue}, ${colorValue}, ${colorValue})`;
+            
             extendedLineCtx.fillStyle = color;
-            extendedLineCtx.fillRect(i * 2, 3, 1, 4);
+    
+            var xPos = (i % pixelsPerRow) * pixelWidth;
+            var yPos = Math.floor(i / pixelsPerRow) * pixelHeight;
+    
+            extendedLineCtx.fillRect(xPos, yPos, pixelWidth, pixelHeight);
         }
     }
 
