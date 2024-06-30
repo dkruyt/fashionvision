@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import confusion_matrix
 from torchvision import datasets, transforms
 from torch.utils.data.sampler import SubsetRandomSampler
+from torchvision.datasets import QMNIST
 
 parser = argparse.ArgumentParser(description='Train a simple neural network on the Fashion-MNIST dataset.')
 parser.add_argument('--hidden_neurons', type=int, default=24, help='Number of neurons in the hidden layer (default: 24)')
@@ -29,17 +30,17 @@ socketio = SocketIO(app, async_mode='eventlet')
 
 # Dictionary mapping Fashion-MNIST label indices to their corresponding class names
 fashion_mnist_labels = {
-    0: 'T-shirt/top',
-    1: 'Trouser',
-    2: 'Pullover',
-    3: 'Dress',
-    4: 'Coat',
-    5: 'Sandal',
-    6: 'Shirt',
-    7: 'Sneaker',
-    8: 'Bag',
-    9: 'Ankle boot'
+    0: 'T-shirt/top', 1: 'Trouser', 2: 'Pullover', 3: 'Dress', 4: 'Coat',
+    5: 'Sandal', 6: 'Shirt', 7: 'Sneaker', 8: 'Bag', 9: 'Ankle boot'
 }
+
+qmnist_labels = {
+    0: '0', 1: '1', 2: '2', 3: '3', 4: '4',
+    5: '5', 6: '6', 7: '7', 8: '8', 9: '9'
+}
+
+current_dataset = 'fashion_mnist'
+train_data, train_targets, val_data, val_targets = None, None, None, None
 
 # Define the neural network model
 class SimpleNN(nn.Module):
@@ -129,6 +130,35 @@ def switch_model():
         current_model = advanced_model
     socketio.emit('log', {'message': f'Switched to {model_type} model'})
     return jsonify({'message': f'Switched to {model_type} model'})
+
+def load_qmnist(limit_per_class=1000, validation_split=0.2):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Lambda(lambda x: 1 - x)  # Invert the image
+    ])
+    full_dataset = QMNIST(root='./data', what='train', download=True, transform=transform)
+    
+    class_counts = {i: 0 for i in range(10)}
+    train_data = []
+    train_targets = []
+    val_data = []
+    val_targets = []
+    
+    for img, label in full_dataset:
+        if class_counts[label] < limit_per_class:
+            img_array = img.numpy()[0]  # QMNIST images are now inverted
+            if np.random.rand() < validation_split:
+                val_data.append(img_array.flatten())
+                val_targets.append(label)
+            else:
+                train_data.append(img_array.flatten())
+                train_targets.append(label)
+            class_counts[label] += 1
+        
+        if all(count >= limit_per_class for count in class_counts.values()):
+            break
+    
+    return (np.array(train_data), np.array(train_targets)), (np.array(val_data), np.array(val_targets))
 
 # Load Fashion-MNIST dataset
 def load_fashion_mnist(limit_per_class=1000, validation_split=0.2):
@@ -275,6 +305,29 @@ def upload_image():
     img_array = 1 - img_array  # Invert the image
     return jsonify({'inputGrid': img_array.tolist()})
 
+@app.route('/switch_dataset', methods=['POST'])
+def switch_dataset():
+    global current_dataset, train_data, train_targets, val_data, val_targets
+    new_dataset = request.json['dataset']
+    if new_dataset in ['fashion_mnist', 'qmnist']:
+        current_dataset = new_dataset
+        if current_dataset == 'fashion_mnist':
+            (train_data, train_targets), (val_data, val_targets) = load_fashion_mnist(limit_per_class=args.limit_per_class)
+        else:
+            (train_data, train_targets), (val_data, val_targets) = load_qmnist(limit_per_class=args.limit_per_class)
+        socketio.emit('log', {'message': f'Switched to {current_dataset} dataset'})
+        return jsonify({'message': f'Switched to {current_dataset} dataset'})
+    else:
+        return jsonify({'error': 'Invalid dataset specified'}), 400
+
+@app.route('/get_current_state', methods=['GET'])
+def get_current_state():
+    global current_dataset, current_model
+    return jsonify({
+        'currentDataset': current_dataset,
+        'currentModel': 'simple' if isinstance(current_model, SimpleNN) else 'advanced'
+    })
+
 @app.route('/train', methods=['POST'])
 def train_model():
     global current_model, train_data, train_targets, val_data, val_targets
@@ -307,6 +360,14 @@ def clear_model_data():
     socketio.emit('log', {'message': 'Model data cleared'})
     return jsonify({'message': 'Model data cleared'})
 
+@app.route('/get_labels', methods=['GET'])
+def get_labels():
+    global current_dataset
+    if current_dataset == 'fashion_mnist':
+        return jsonify(fashion_mnist_labels)
+    else:
+        return jsonify(qmnist_labels)
+
 @app.route('/training_data', methods=['GET'])
 def get_training_data():
     global train_data, train_targets
@@ -322,8 +383,24 @@ def get_training_data():
         })
     return jsonify({'trainingData': training_data})
 
+def get_training_data():
+    global train_data, train_targets, current_dataset
+    labels = fashion_mnist_labels if current_dataset == 'fashion_mnist' else qmnist_labels
+    training_data = []
+    for img, label in zip(train_data, train_targets):
+        img = Image.fromarray((img.reshape(28, 28) * 255).astype(np.uint8))
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        training_data.append({
+            'image': img_str,
+            'label': labels[int(label)]
+        })
+    return training_data
+
 def get_latest_validation_data():
-    global current_model, val_data, val_targets
+    global current_model, val_data, val_targets, current_dataset
+    labels = fashion_mnist_labels if current_dataset == 'fashion_mnist' else qmnist_labels
     validation_data = []
     current_model.eval()
     with torch.no_grad():
@@ -331,7 +408,7 @@ def get_latest_validation_data():
             img_tensor = torch.tensor(img, dtype=torch.float32).unsqueeze(0)
             output = current_model(img_tensor)
             predicted = output.argmax().item()
-            is_correct = int(predicted == target)  # Convert boolean to int
+            is_correct = int(predicted == target)
 
             img = Image.fromarray((img.reshape(28, 28) * 255).astype(np.uint8))
             buffered = io.BytesIO()
@@ -339,8 +416,8 @@ def get_latest_validation_data():
             img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
             validation_data.append({
                 'image': img_str,
-                'predicted': fashion_mnist_labels[int(predicted)],
-                'actual': fashion_mnist_labels[int(target.item())],
+                'predicted': labels[int(predicted)],
+                'actual': labels[int(target.item())],
                 'is_correct': is_correct
             })
     return validation_data
@@ -367,14 +444,14 @@ def train_single_example():
     optimizer = optim.Adam(current_model.parameters(), lr=0.001)
 
     train(current_model, criterion, optimizer, train_dataloader, epochs=1)
-    socketio.emit('log', {'message': f'Trained on single example of class {fashion_mnist_labels[class_label]}'})
+    socketio.emit('log', {'message': f'Trained on single example of class {qmnist_labels[class_label]}'})
     current_model.eval()
     
     # Get updated validation data
     updated_validation_data = get_latest_validation_data()
     
     return jsonify({
-        'message': f'Trained on single example of class {fashion_mnist_labels[class_label]}',
+        'message': f'Trained on single example of class {qmnist_labels[class_label]}',
         'validationData': updated_validation_data
     })
 

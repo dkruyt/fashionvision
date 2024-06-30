@@ -7,21 +7,23 @@ $(document).ready(function() {
     let extendedLineCanvas = document.getElementById('extendedLineCanvas');
     let extendedLineCtx = extendedLineCanvas.getContext('2d');
     
-    let trainingLossChart;
-    let validationLossChart;
-    let trainingAccuracyChart;
-    let validationAccuracyChart;
-
+    let currentDataset = 'fashion_mnist';
     let currentModel = 'simple';
 
     let lossChart;
     let accuracyChart;
 
+    let currentLabels = {};
+
+    fetchCurrentState();
     predict();
+    fetchLabels();
     updateSwitchButtonText();
     drawInputGrid();
     drawExtendedLine();
     initializeCharts();
+    updateSwitchDatasetButtonText();
+    prepareData();
 
 
     $('#switchModelButton').click(function() {
@@ -33,13 +35,45 @@ $(document).ready(function() {
             data: JSON.stringify({ modelType: newModel }),
             success: function(response) {
                 console.log(response.message);
-                currentModel = newModel;
-                updateSwitchButtonText();
-                alert(`Switched to ${currentModel} model`);
+                fetchCurrentState();  // This will update currentModel and UI
+                alert(`Switched to ${newModel} model`);
                 predict();  // Update the prediction with the new model
+            },
+            error: function(xhr, status, error) {
+                console.error("Error switching model:", error);
+                alert("Failed to switch model. See console for details.");
             }
         });
     });
+
+    function fetchLabels() {
+        $.ajax({
+            url: '/get_labels',
+            method: 'GET',
+            success: function(response) {
+                currentLabels = response;
+                updateUIWithLabels();
+            },
+            error: function(xhr, status, error) {
+                console.error("Error fetching labels:", error);
+            }
+        });
+    }
+
+    function updateUIWithLabels() {
+        // Update output layer labels
+        $('#outputLayer .neuron-number').each(function(index) {
+            $(this).text(currentLabels[index]);
+        });
+    
+        // Update any other UI elements that use labels
+        // For example, if you have a dropdown for selecting classes:
+        // var $dropdown = $('#classDropdown');
+        // $dropdown.empty();
+        // Object.entries(currentLabels).forEach(([key, value]) => {
+        //     $dropdown.append($('<option></option>').attr('value', key).text(value));
+        // });
+    }
 
     function updateSwitchButtonText() {
         const buttonText = currentModel === 'simple' ? 'Switch to Advanced Model' : 'Switch to Simple Model';
@@ -57,6 +91,21 @@ $(document).ready(function() {
                 $('#biasHistogram').attr('src', 'data:image/png;base64,' + response.biasHist);
                 $('#activationHistogram').attr('src', 'data:image/png;base64,' + response.activationHist);
                 updateConfidenceChart(response.confidence);
+            }
+        });
+    }
+
+    function fetchCurrentState() {
+        $.ajax({
+            url: '/get_current_state',
+            method: 'GET',
+            success: function(response) {
+                currentDataset = response.currentDataset;
+                currentModel = response.currentModel;
+                updateUIWithCurrentState();
+            },
+            error: function(xhr, status, error) {
+                console.error("Error fetching current state:", error);
             }
         });
     }
@@ -351,8 +400,7 @@ $(document).ready(function() {
             var imageIndex = getImageIndex(activation);
             outputHtml += '<div class="neuron-container" style="text-align: center;">';
             outputHtml += '<div class="neuron output-neuron" style="background-image: url(\'static/images/' + imageIndex + '.svg\');" data-index="' + i + '"><span>' + activation.toFixed(2) + '</span></div>';
-            const labels = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'];
-            outputHtml += '<div class="neuron-number">' + labels[i] + '</div>'; // Use Fashion-MNIST class names
+            outputHtml += '<div class="neuron-number">' + currentLabels[i] + '</div>'; // Use dynamic labels
             outputHtml += '</div>';
         }
         $('#outputLayer').html(outputHtml);
@@ -375,12 +423,15 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ inputGrid: inputGrid }),
             success: function(response) {
-                const labels = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'];
                 var predictedClass = response.predictedClass;
                 var hiddenActivations = response.hiddenActivations;
                 var outputActivations = response.outputActivations;
-                $('#result').text('Result: ' + labels[predictedClass]);
+                $('#result').text('Result: ' + currentLabels[predictedClass]);
                 updateActivations(hiddenActivations, outputActivations);
+            },
+            error: function(xhr, status, error) {
+                console.error("Error in prediction:", error);
+                $('#result').text('Prediction failed. See console for details.');
             }
         });
     }
@@ -425,7 +476,7 @@ $(document).ready(function() {
         var trainingHtml = '';
         for (var i = 0; i < trainingData.length; i++) {
             var img = trainingData[i];
-            var imgHtml = '<img src="data:image/png;base64,' + img.image + '" width="28" height="28" data-index="' + i + '" title="Class: ' + img.label + '">';
+            var imgHtml = '<img src="data:image/png;base64,' + img.image + '" width="28" height="28" data-index="' + i + '" title="Class: ' + currentLabels[img.label] + '">';
             trainingHtml += imgHtml;
         }
         $('#trainingData').html(trainingHtml);
@@ -464,7 +515,7 @@ $(document).ready(function() {
                                     width="28" height="28" 
                                     data-index="${i}" 
                                     class="validation-image ${borderClass}"
-                                    title="Predicted: ${item.predicted}\nActual: ${item.actual}">
+                                    title="Predicted: ${currentLabels[item.predicted]}\nActual: ${currentLabels[item.actual]}">
                            </div>`;
             validationHtml += imgHtml;
         }
@@ -475,7 +526,58 @@ $(document).ready(function() {
         var index = $(this).data('index');
         loadValidationImage(index);
     });
+ 
+    $('#switchDatasetButton').click(function() {
+        const newDataset = currentDataset === 'fashion_mnist' ? 'qmnist' : 'fashion_mnist';
+        $.ajax({
+            url: '/switch_dataset',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ dataset: newDataset }),
+            success: function(response) {
+                console.log(response.message);
+                fetchCurrentState();  // This will update currentDataset and UI
+                alert(`Switched to ${newDataset} dataset`);
+                prepareData();  // Reload the data with the new dataset
+            },
+            error: function(xhr, status, error) {
+                console.error("Error switching dataset:", error);
+                alert("Failed to switch dataset. See console for details.");
+            }
+        });
+    });
     
+    function updateSwitchDatasetButtonText() {
+        const buttonText = currentDataset === 'fashion_mnist' ? 'Switch to QMNIST' : 'Switch to Fashion-MNIST';
+        $('#switchDatasetButton').text(buttonText);
+    }
+
+    function updateSwitchModelButtonText() {
+        const buttonText = currentModel === 'simple' ? 'Switch to Advanced Model' : 'Switch to Simple Model';
+        $('#switchModelButton').text(buttonText);
+    }
+
+    function updateUIWithCurrentState() {
+        // Update dataset switch button
+        updateSwitchDatasetButtonText();
+    
+        // Update model switch button
+        updateSwitchModelButtonText();
+    
+        // You might want to update other UI elements based on the current state
+        // For example, you might want to show/hide certain elements depending on the model
+        // if (currentModel === 'simple') {
+        //     $('.simple-model-element').show();
+        //     $('.advanced-model-element').hide();
+        // } else {
+        //     $('.simple-model-element').hide();
+        //     $('.advanced-model-element').show();
+        // }
+    
+        // Fetch labels for the current dataset
+        fetchLabels();
+    }
+
     function loadValidationImage(index) {
         $.ajax({
             url: '/load_validation_image',
