@@ -218,6 +218,31 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="mb-4">
+                        This visualization represents the structure and current state of the neural network. 
+                        It shows how information flows from the input layer through the hidden layer(s) to the output layer.
+                    </p>
+                    <ul>
+                        <li><strong>Nodes (circles)</strong> represent individual neurons in each layer</li>
+                        <li><strong>Lines</strong> represent connections (weights) between neurons</li>
+                        <li><strong>Colors</strong> indicate the strength and direction of connections:
+                            <ul>
+                                <li>Red lines represent positive weights</li>
+                                <li>Blue lines represent negative weights</li>
+                                <li>Brighter colors indicate stronger connections</li>
+                            </ul>
+                        </li>
+                        <li><strong>Node colors</strong> represent the activation level of each neuron:
+                            <ul>
+                                <li>Brighter colors indicate higher activation</li>
+                                <li>Darker colors indicate lower activation</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <p>
+                        This visualization helps you understand how the network processes information and makes decisions. 
+                        Look for patterns in the connections and activations to gain insights into what features the network finds important.
+                    </p>
                     <canvas id="networkVisualizationCanvas"></canvas>
                 </div>
                 <div class="modal-footer">
@@ -235,8 +260,27 @@
                     <h5 class="modal-title" id="confusionMatrixModalLabel">Confusion Matrix</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body d-flex justify-content-center align-items-center">
-                    <div id="confusionMatrixContainer"></div>
+                <div class="modal-body">
+                    <p class="mb-4">
+                        A confusion matrix is a table that visualizes the performance of a classification model. 
+                        It shows the number of correct and incorrect predictions made by the model compared to the actual outcomes.
+                    </p>
+                    <ul>
+                        <li><strong>Rows</strong> represent the actual classes</li>
+                        <li><strong>Columns</strong> represent the predicted classes</li>
+                        <li>The <strong>diagonal elements</strong> represent the number of correct predictions for each class</li>
+                        <li>The <strong>off-diagonal elements</strong> represent the misclassifications</li>
+                    </ul>
+                    <p>
+                        A perfect model would have high numbers along the diagonal and zeros elsewhere. 
+                        Look for patterns in misclassifications to understand where the model might be struggling.
+                    </p>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <div id="confusionMatrixContainer"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -251,23 +295,28 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="mb-4">These graphs show the distributions of weights, biases, and activations in the neural network, as well as the prediction confidence for the current input.</p>
                     <div class="row">
                         <div class="col-md-6">
                             <h3>Weight Distribution</h3>
+                            <p>This histogram shows the distribution of weights in the neural network. A balanced distribution around zero is generally desirable.</p>
                             <img id="weightHistogram" class="img-fluid">
                         </div>
                         <div class="col-md-6">
                             <h3>Bias Distribution</h3>
+                            <p>This histogram shows the distribution of biases in the neural network. Biases help shift the activation function and can be crucial for learning.</p>
                             <img id="biasHistogram" class="img-fluid">
                         </div>
                     </div>
                     <div class="row mt-4">
                         <div class="col-md-6">
                             <h3>Activation Distribution</h3>
+                            <p>This histogram shows the distribution of neuron activations for the current input. It helps understand which neurons are active and to what degree.</p>
                             <img id="activationHistogram" class="img-fluid">
                         </div>
                         <div class="col-md-6">
                             <h3>Prediction Confidence</h3>
+                            <p>This bar chart shows the network's confidence in each possible class for the current input. Higher bars indicate greater confidence.</p>
                             <canvas id="confidenceChart"></canvas>
                         </div>
                     </div>
@@ -289,33 +338,37 @@
                 </div>
                 <div class="modal-body">
                     <h4>Welcome to DataVision!</h4>
-                    <p>DataVision is an interactive web application that allows you to explore and understand how a neural network recognizes fashion items. Follow the steps below to get started:</p>
+                    <p>DataVision is an interactive web application that allows you to explore and understand how a neural network recognizes images. Follow the steps below to get started:</p>
                     <ol>
                         <li>
-                            <strong>Load Training Data:</strong> Click the "Load Data" button to load the training data. This data consists of a collection of clothing items that will be used to train the neural network. The loaded training images will be displayed in the "Training Data" section.
+                            <strong>Load Training Data:</strong> Click the "Load Data" button to load the training data. This data consists of a collection of images that will be used to train the neural network. The loaded training images will be displayed in the "Training Data" section.
                         </li>
                         <li>
-                            <strong>Explore the Neural Network:</strong> Take a moment to familiarize yourself with the neural network architecture displayed on the left side of the screen. The input layer represents a 28x28 grid where you can draw a clothing item, the hidden layer consists of neurons that learn to recognize patterns, and the output layer represents the predicted item.
+                            <strong>Explore the Neural Network:</strong> Take a moment to familiarize yourself with the neural network architecture displayed on the left side of the screen. The input layer represents a 28x28 grid where you can draw or upload an image, the hidden layer consists of neurons that learn to recognize patterns, and the output layer represents the predicted class.
                         </li>
                         <li>
-                            <strong>Draw an Item:</strong> Use your mouse to draw an item on the input layer grid. Click on individual cells to toggle them between black and white. The goal is to draw a recognizable item that the neural network can predict.
+                            <strong>Draw or Upload an Image:</strong> Use your mouse to draw on the input layer grid or click the "Upload Image" button to use an existing image. The goal is to provide an image that the neural network can classify.
                         </li>
                         <li>
-                            <strong>Make a Prediction:</strong> Once you've drawn an item, click the "Predict" button to see what the neural network thinks the item is. The predicted item will be displayed in the "Dashboard" section.
+                            <strong>Make a Prediction:</strong> Once you've drawn or uploaded an image, click the "Predict" button to see what the neural network thinks the image represents. The predicted class will be displayed in the "Dashboard" section.
                         </li>
                         <li>
                             <strong>Train the Neural Network:</strong> To improve the neural network's accuracy, you can train it using the loaded training data. Click the "Train 1x," "Train 10x," or "Train 100x" buttons to train the network for the specified number of epochs. During training, the app will display the training progress and metrics in the log window.
                         </li>
                         <li>
-                            <strong>Evaluate the Neural Network:</strong> After training, you can draw more items and click "Predict" to see how well the neural network performs. The app will display the predicted item and the activations of the hidden and output layers.
+                            <strong>Evaluate the Neural Network:</strong> After training, you can provide more images and click "Predict" to see how well the neural network performs. The app will display the predicted class and the activations of the hidden and output layers.
                         </li>
                         <li>
                             <strong>Explore Further:</strong>
                             <ul>
-                                <li>Click on the neurons in the output layer to see how the neural network responds when you manually assign a label to your drawn item. This can help you understand how the network learns from individual examples.</li>
-                                <li>Use the "Clear" button to clear the input layer grid and start drawing a new item.</li>
+                                <li>Click on the neurons in the output layer to see how the neural network responds when you manually assign a label to your input image. This can help you understand how the network learns from individual examples.</li>
+                                <li>Use the "Clear" button to clear the input layer grid and start with a new image.</li>
                                 <li>Click the "Clear Model Data" button to reset the neural network to its initial state, clearing all learned weights.</li>
                                 <li>Explore the "Graphs" section to visualize the training and validation metrics, including loss and accuracy over epochs.</li>
+                                <li>Check the "Distributions" to see histograms of weights, biases, and activations, as well as the prediction confidence for the current input.</li>
+                                <li>View the "Confusion Matrix" to understand how well the model is performing across different classes.</li>
+                                <li>Use the "Switch to Advanced Model" button to toggle between a simple and more complex neural network architecture.</li>
+                                <li>Use the "Switch to QMNIST" button to change between different datasets (Fashion-MNIST and QMNIST).</li>
                             </ul>
                         </li>
                     </ol>
@@ -337,19 +390,19 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="mb-4">These graphs show the performance of the neural network during training. They help visualize how well the model is learning and if it's overfitting or underfitting.</p>
                     <div class="row">
-                        <div class="modal-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h3>Loss</h3>
-                                    <canvas id="lossChart"></canvas>
-                                </div>
-                                <div class="col-md-6">
-                                    <h3>Accuracy</h3>
-                                    <canvas id="accuracyChart"></canvas>
-                                </div>
-                            </div>
+                        <div class="col-md-6">
+                            <h3>Loss</h3>
+                            <p>This graph shows how the loss (error) decreases over time for both training and validation data. Lower loss indicates better performance.</p>
+                            <canvas id="lossChart"></canvas>
                         </div>
+                        <div class="col-md-6">
+                            <h3>Accuracy</h3>
+                            <p>This graph shows how the accuracy improves over time for both training and validation data. Higher accuracy indicates better performance.</p>
+                            <canvas id="accuracyChart"></canvas>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

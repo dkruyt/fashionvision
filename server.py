@@ -20,7 +20,7 @@ from torchvision.datasets import QMNIST
 
 parser = argparse.ArgumentParser(description='Train a simple neural network on the Fashion-MNIST dataset.')
 parser.add_argument('--hidden_neurons', type=int, default=24, help='Number of neurons in the hidden layer (default: 24)')
-parser.add_argument('--limit_per_class', type=int, default=250, help='Number of samples per class for training (default: 200)')
+parser.add_argument('--limit_per_class', type=int, default=300, help='Number of samples per class for training (default: 200)')
 
 args = parser.parse_args()
 
