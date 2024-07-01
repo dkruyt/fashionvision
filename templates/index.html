@@ -139,6 +139,18 @@
             height: 850px; /* Slightly larger than the plot to account for any margins */
             width: 100%;
         }
+        #trainingProgressContainer {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        .progress {
+            height: 25px;
+        }
+
+        .progress-bar {
+            background-color: #3399cc;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -194,6 +206,13 @@
                             <input type="file" id="imageUpload" accept="image/*" style="display: none;">
                         </div>
                         <div id="result" class="mt-3"></div>
+                        <div id="trainingProgressContainer" class="mt-3" style="display: none;">
+                            <h5>Training Progress</h5>
+                            <div class="progress">
+                                <div id="trainingProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>
+                            </div>
+                            <p id="trainingProgressText" class="mt-2"></p>
+                        </div>
                         <div id="logWindow" class="mt-3"></div>
                         <div id="trainingDataSection">
                             <h3 class="mt-4">Training Data</h3>

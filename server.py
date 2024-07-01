@@ -243,6 +243,14 @@ def train(current_model, criterion, optimizer, train_dataloader, val_dataloader=
         training_metrics['validation_loss'].append(val_loss)
         training_metrics['training_accuracy'].append(train_accuracy)
         training_metrics['validation_accuracy'].append(val_accuracy)
+
+        # Emit progress update
+        socketio.emit('training_progress', {
+            'epoch': epoch + 1,
+            'total_epochs': epochs,
+            'train_loss': train_loss,
+            'train_accuracy': train_accuracy
+        })
         
         if epoch % 1 == 0:
             log_message = f"Epoch {epoch}, Training Loss: {train_loss:.4f}, Training Accuracy: {train_accuracy:.2f}%"
@@ -252,7 +260,9 @@ def train(current_model, criterion, optimizer, train_dataloader, val_dataloader=
             socketio.emit('log', {'message': log_message})
             socketio.emit('training_metrics', training_metrics)
             socketio.sleep(0) 
-    
+
+    # Training complete
+    socketio.emit('training_complete')
     current_model.cpu()
 
 @app.route('/')

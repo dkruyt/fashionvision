@@ -486,6 +486,7 @@ $(document).ready(function() {
                 console.log(response.message);
                 showValidationData(response.validationData);
                 predict();
+                hideTrainingProgress();
             }
         });
     }
@@ -839,10 +840,14 @@ $(document).ready(function() {
 
     $('#predictButton').click(predict);
     $('#clearButton').click(clear);
-    $('#train1Button').click(function() { trainModel(1); });
-    $('#train10Button').click(function() { trainModel(10); });
-    $('#train100Button').click(function() { trainModel(100); });
     $('#clearModelButton').click(clearModelData);
+
+    $('#train1Button, #train10Button, #train100Button').click(function() {
+        const epochs = parseInt($(this).attr('id').replace('train', '').replace('Button', ''));
+        showTrainingProgress();
+        trainModel(epochs);
+    });
+
 
     // Socket.IO client
     var socket = io();
@@ -859,6 +864,14 @@ $(document).ready(function() {
         updateCharts(metrics);
     });
 
+    socket.on('training_progress', function(data) {
+        updateTrainingProgress(data.epoch, data.total_epochs);
+    });
+    
+    socket.on('training_complete', function() {
+        hideTrainingProgress();
+    });
+
     $('#helpButton').click(function() {
         $('#helpModal').modal('show');
     });
@@ -866,6 +879,21 @@ $(document).ready(function() {
     $('#graphsButton').click(function() {
         $('#graphsModal').modal('show');
     });
+
+    //ProgressBar
+    function showTrainingProgress() {
+        $('#trainingProgressContainer').show();
+    }
+    
+    function hideTrainingProgress() {
+        $('#trainingProgressContainer').hide();
+    }
+    
+    function updateTrainingProgress(epoch, totalEpochs) {
+        const progress = (epoch / totalEpochs) * 100;
+        $('#trainingProgressBar').css('width', `${progress}%`).attr('aria-valuenow', progress);
+        $('#trainingProgressText').text(`Epoch ${epoch} of ${totalEpochs}`);
+    }
 
     //Drawing
     let isDrawing = false;
