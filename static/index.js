@@ -831,17 +831,30 @@ $(document).ready(function() {
             type: 'heatmap',
             colorscale: 'RdBu',
             zmin: -1,
-            zmax: 1
+            zmax: 1,
+            showscale: false // This removes the color scale bar
         }];
     
         const layout = {
-            title: 'Weight Matrix',
-            width: 300,
-            height: 300,
-            margin: {t: 30, b: 20, l: 20, r: 20}
+            width: 140,
+            height: 140,
+            margin: {t: 0, b: 0, l: 0, r: 0}, // Remove all margins
+            xaxis: {
+                showgrid: false,
+                zeroline: false,
+                showticklabels: false,
+            },
+            yaxis: {
+                showgrid: false,
+                zeroline: false,
+                showticklabels: false,
+            }
         };
     
-        Plotly.newPlot('weightHeatmapPopup', data, layout, {displayModeBar: false});
+        Plotly.newPlot('weightHeatmapPopup', data, layout, {
+            displayModeBar: false,
+            responsive: false
+        });
     }
     
     function reshapeArray(arr, rows, cols) {
