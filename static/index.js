@@ -678,11 +678,15 @@ $(document).ready(function() {
     }
 
     function addNeuronClickHandlers() {
-        $('.hidden-neuron').click(function() {
-            var index = $(this).data('index');
-            console.log('Hidden neuron ' + index + ' clicked');
-            // Implement the desired functionality here
-        });
+        $('.hidden-neuron').hover(
+            function(e) {
+                var index = $(this).data('index');
+                showWeightHeatmap(index, e.pageX + 10, e.pageY + 10);
+            },
+            function() {
+                hideWeightHeatmap();
+            }
+        );
 
         $('.output-neuron').click(function() {
             var index = $(this).data('index');
@@ -695,6 +699,24 @@ $(document).ready(function() {
         var ctxLoss = document.getElementById('lossChart').getContext('2d');
         var ctxAccuracy = document.getElementById('accuracyChart').getContext('2d');
         
+        const commonOptions = {
+            responsive: true,
+            scales: {
+                x: { beginAtZero: true },
+                y: { beginAtZero: true }
+            },
+            elements: {
+                point: {
+                    radius: 0 // This removes the dots
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        };
+    
         lossChart = new Chart(ctxLoss, {
             type: 'line',
             data: {
@@ -703,23 +725,18 @@ $(document).ready(function() {
                     label: 'Training Loss',
                     data: [],
                     borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
+                    borderWidth: 2,
                     fill: false
                 },
                 {
                     label: 'Validation Loss',
                     data: [],
                     borderColor: 'rgba(153, 102, 255, 1)',
-                    borderWidth: 1,
+                    borderWidth: 2,
                     fill: false
                 }]
             },
-            options: {
-                scales: {
-                    x: { beginAtZero: true },
-                    y: { beginAtZero: true }
-                }
-            }
+            options: commonOptions
         });
         
         accuracyChart = new Chart(ctxAccuracy, {
@@ -730,23 +747,18 @@ $(document).ready(function() {
                     label: 'Training Accuracy',
                     data: [],
                     borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1,
+                    borderWidth: 2,
                     fill: false
                 },
                 {
                     label: 'Validation Accuracy',
                     data: [],
                     borderColor: 'rgba(255, 159, 64, 1)',
-                    borderWidth: 1,
+                    borderWidth: 2,
                     fill: false
                 }]
             },
-            options: {
-                scales: {
-                    x: { beginAtZero: true },
-                    y: { beginAtZero: true }
-                }
-            }
+            options: commonOptions
         });
     }
 
@@ -810,6 +822,52 @@ $(document).ready(function() {
         }
     
         Plotly.newPlot('confusionMatrixContainer', data, layout, {displayModeBar: false});
+    }
+
+    function createWeightHeatmap(weights) {
+        const size = Math.sqrt(weights.length);
+        const data = [{
+            z: reshapeArray(weights, size, size),
+            type: 'heatmap',
+            colorscale: 'RdBu',
+            zmin: -1,
+            zmax: 1
+        }];
+    
+        const layout = {
+            title: 'Weight Matrix',
+            width: 300,
+            height: 300,
+            margin: {t: 30, b: 20, l: 20, r: 20}
+        };
+    
+        Plotly.newPlot('weightHeatmapPopup', data, layout, {displayModeBar: false});
+    }
+    
+    function reshapeArray(arr, rows, cols) {
+        const result = [];
+        for (let i = 0; i < rows; i++) {
+            result.push(arr.slice(i * cols, (i + 1) * cols));
+        }
+        return result;
+    }
+    
+    function showWeightHeatmap(neuronIndex, x, y) {
+        $.ajax({
+            url: '/get_hidden_neuron_weights',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ neuronIndex: neuronIndex }),
+            success: function(response) {
+                createWeightHeatmap(response.weights);
+                const popup = $('#weightHeatmapPopup');
+                popup.css({top: y, left: x}).show();
+            }
+        });
+    }
+    
+    function hideWeightHeatmap() {
+        $('#weightHeatmapPopup').hide();
     }
 
     function updateCharts(metrics) {

@@ -20,10 +20,9 @@ from torchvision.datasets import QMNIST
 
 parser = argparse.ArgumentParser(description='Train a simple neural network on the Fashion-MNIST dataset.')
 parser.add_argument('--hidden_neurons', type=int, default=24, help='Number of neurons in the hidden layer (default: 24)')
-parser.add_argument('--limit_per_class', type=int, default=300, help='Number of samples per class for training (default: 200)')
+parser.add_argument('--limit_per_class', type=int, default=500, help='Number of samples per class for training (default: 200)')
 
 args = parser.parse_args()
-
 
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='eventlet')
@@ -270,6 +269,18 @@ def index():
     num_classes = 10  # Fashion-MNIST has 10 classes
     return render_template('index.html', num_classes=num_classes)
 
+@app.route('/get_hidden_neuron_weights', methods=['POST'])
+def get_hidden_neuron_weights():
+    neuron_index = request.json['neuronIndex']
+    if isinstance(current_model, SimpleNN):
+        weights = current_model.hidden.weight[neuron_index].detach().numpy()
+    elif isinstance(current_model, FashionMNISTNet):
+        weights = current_model.fc1.weight[neuron_index].detach().numpy()
+    else:
+        return jsonify({'error': 'Unsupported model type'})
+    
+    return jsonify({'weights': weights.tolist()})
+
 @app.route('/predict', methods=['POST'])
 def predict():
     input_grid = request.json['inputGrid']
@@ -357,7 +368,7 @@ def train_model():
     
     # Get updated validation data
     updated_validation_data = get_latest_validation_data()
-    
+    print(current_model)
     return jsonify({
         'message': 'Training completed',
         'validationData': updated_validation_data
